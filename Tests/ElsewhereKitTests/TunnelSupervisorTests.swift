@@ -11,7 +11,7 @@ struct TunnelSupervisorTests {
     @Test func directOnlyStartThenStop() async throws {
         let supervisor = TunnelSupervisor()
         let lanes = try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         // No exits, still the direct lane: the builder always emits it.
         #expect(lanes == [.init(
             exitName: "direct", inboundPort: lanes[0].inboundPort,
@@ -26,7 +26,7 @@ struct TunnelSupervisorTests {
 
         // And it can come straight back up — one core, sequentially.
         _ = try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         #expect(await supervisor.isUp)
         await supervisor.stop()
     }
@@ -53,7 +53,7 @@ struct TunnelSupervisorTests {
             return try await XrayCore.shared.freePorts(count, excluding: Set(excluding))
         })
         let lanes = try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         #expect(calls.withLock { $0 } == 2)
         #expect(lanes[0].inboundPort != squatPort)
         await supervisor.stop()
@@ -62,10 +62,10 @@ struct TunnelSupervisorTests {
     @Test func startWhileRunningIsATunnelError() async throws {
         let supervisor = TunnelSupervisor()
         try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         do {
             _ = try await supervisor.start(
-                exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+                exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
             Issue.record("expected a throw")
         } catch ElsewhereError.tunnel(let message) {
             #expect(message.contains("already running"))
@@ -81,7 +81,7 @@ struct TunnelSupervisorTests {
         let supervisor = TunnelSupervisor(readinessTimeout: .zero)
         do {
             _ = try await supervisor.start(
-                exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+                exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
             Issue.record("expected a throw")
         } catch ElsewhereError.tunnel(let message) {
             #expect(message.contains("did not accept"))

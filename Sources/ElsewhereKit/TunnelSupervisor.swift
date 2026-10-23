@@ -36,13 +36,15 @@ public actor TunnelSupervisor {
     }
 
     /// Brings the engine up: candidates → build → `test` → `run` → readiness poll.
-    /// `excludingPorts` are extra loopback ports never issued (the caller passes the
-    /// `proxy` exits' ports); INCY's is excluded always.
+    /// `includeDirect` asks for the `direct` lane — only the lanes a call needs are
+    /// bound (A9). `excludingPorts` are extra loopback ports never issued (the caller
+    /// passes the `proxy` exits' ports); INCY's is excluded always.
     /// - Throws: `.tunnel` when already running or when an inbound stays closed;
     ///   `.engine` on engine failures (scrubbed); `XrayConfigBuilder`'s `.exit`/`.config`.
     @discardableResult
     public func start(
         exits: [(name: String, outbound: JSONValue)],
+        includeDirect: Bool,
         bindInterface: String?,
         log: XrayConfigBuilder.XrayLog,
         excludingPorts: [UInt16]
@@ -57,16 +59,17 @@ public actor TunnelSupervisor {
         var lastError: ElsewhereError?
         for attempt in 0...1 {
             if attempt > 0 { logger.notice("retrying start with fresh candidate ports") }
+            let needed = exits.count + (includeDirect ? 1 : 0)
             let ports: [UInt16]
             do {
-                ports = try await portCandidates(exits.count + 1, excluded)
+                ports = try await portCandidates(needed, excluded)
             } catch {
                 throw .engine(Redactor.scrubPatterns(error.localizedDescription))
             }
-            guard ports.count == exits.count + 1 else {
+            guard ports.count == needed else {
                 throw .engine(
                     "freePorts returned \(ports.count) candidates, "
-                        + "needed \(exits.count + 1)")
+                        + "needed \(needed)")
             }
 
             var portsByName: [String: UInt16] = [:]
@@ -76,7 +79,8 @@ public actor TunnelSupervisor {
             // .exit/.config from here are definition errors — retrying can't help them.
             let built = try XrayConfigBuilder.build(
                 exits: exits, ports: portsByName,
-                directPort: ports[exits.count], bindInterface: bindInterface, log: log)
+                directPort: includeDirect ? ports[exits.count] : nil,
+                bindInterface: bindInterface, log: log)
             do {
                 try await XrayCore.shared.test(configJSON: built.configJSON)
             } catch {

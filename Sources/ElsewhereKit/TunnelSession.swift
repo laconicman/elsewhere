@@ -73,7 +73,8 @@ public actor TunnelSession {
                         + "set bindInterface to a name or `none` to run via the system path")
             }
             let lanes = try await supervisor.start(
-                exits: xrayExits, bindInterface: interface, log: log,
+                exits: xrayExits, includeDirect: includeDirect,
+                bindInterface: interface, log: log,
                 excludingPorts: excludedPorts)
             startedEngine = true
             for lane in lanes {

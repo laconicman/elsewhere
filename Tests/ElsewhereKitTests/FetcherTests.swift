@@ -17,7 +17,7 @@ struct FetcherTests {
         defer { server.stop() }
         let supervisor = TunnelSupervisor()
         let lanes = try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         do {
             try await body(
                 .inbound(exit: "direct", port: lanes[0].inboundPort),

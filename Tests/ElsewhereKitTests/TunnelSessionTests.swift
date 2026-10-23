@@ -52,13 +52,41 @@ struct TunnelSessionTests {
         }
         #expect(exit == "moldova")
         #expect(await LoopbackProbe.isListening(port: port))
-        // The direct lane is built alongside — the builder always emits it.
+        // `includeDirect: true` — the direct lane is here because it was asked for.
         guard case .inbound = try await session.route(for: "direct") else {
             Issue.record("no direct lane alongside the exit")
             return
         }
         await session.close()
         #expect(!(await LoopbackProbe.isListening(port: port)))
+    }
+
+    /// A9 in the lanes themselves: a session opened for `moldova` alone carries no
+    /// `direct` route — and a `--direct` session carries only `direct`.
+    @Test func lanesAreOnlyWhatTheCallNeeds() async throws {
+        let exitOnly = try await TunnelSession.open(
+            config: config(), exits: ["moldova"], includeDirect: false,
+            bindInterface: .none, log: .silent)
+        do {
+            _ = try await exitOnly.route(for: "direct")
+            Issue.record("a moldova-only session routed 'direct'")
+        } catch is ElsewhereError {
+        }
+        await exitOnly.close()
+
+        let directOnly = try await TunnelSession.open(
+            config: config(), exits: [], includeDirect: true,
+            bindInterface: .none, log: .silent)
+        guard case .inbound = try await directOnly.route(for: "direct") else {
+            Issue.record("no direct lane in a direct-only session")
+            return
+        }
+        do {
+            _ = try await directOnly.route(for: "moldova")
+            Issue.record("a direct-only session routed 'moldova'")
+        } catch is ElsewhereError {
+        }
+        await directOnly.close()
     }
 
     @Test func unknownExitNamesAreExitErrors() async {
