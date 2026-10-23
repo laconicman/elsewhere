@@ -546,22 +546,28 @@ extension Renderer {
             }
         }
         guard !rows.isEmpty else { return [] }
+        // Built incrementally so the fan itself respects the cap — trimming a
+        // finished row would still have allocated every fanned cell first.
         func cells(_ row: Element) -> [String] {
-            row.children().flatMap { cell -> [String] in
+            var out: [String] = []
+            for cell in row.children() {
+                guard out.count < maxTableColumns else { break }
                 guard ["td", "th"].contains(cell.tagName().lowercased())
-                else { return [] }
+                else { continue }
                 let text = trimBlock(
                     inline(cell, markdown: markdown, depth: depth + 2))
                     .replacingOccurrences(of: "\n", with: " ")
                 // HTML clamps a `colspan` above 1000 to 1000 — the same bound
-                // before the fan, so a billion can't allocate a billion cells.
+                // before the fan, and the row never passes maxTableColumns.
                 let raw = (try? cell.attr("colspan"))
                     .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 1
-                let span = min(max(raw, 1), 1000)
-                return [text] + Array(repeating: "", count: max(0, span - 1))
+                let fan = min(max(raw, 1), 1000, maxTableColumns - out.count)
+                out.append(text)
+                out += Array(repeating: "", count: fan - 1)
             }
+            return out
         }
-        var grid = rows.map { Array(cells($0).prefix(maxTableColumns)) }
+        var grid = rows.map(cells)
         let width = min(grid.map(\.count).max() ?? 0, maxTableColumns)
         guard width > 0 else { return [] }
         for index in grid.indices where grid[index].count < width {

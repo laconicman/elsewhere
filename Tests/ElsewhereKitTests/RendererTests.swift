@@ -532,6 +532,21 @@ struct RendererTests {
             <= Renderer.maxTableColumns + 1)
     }
 
+    /// A row of giant spans stops fanning at the cap — 300 × `colspan="1000"`
+    /// is exactly a `maxTableColumns`-wide table, built without materialising
+    /// the unbounded row first.
+    @Test func tableRowsStopFanningAtTheColumnCap() {
+        let cells = String(repeating: "<td colspan=\"1000\">x</td>", count: 300)
+        let rendered = Renderer.render(
+            "<body><table><tr>\(cells)</tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        let separator = rendered.components(separatedBy: "\n")
+            .first { $0.contains("---") }
+        #expect(separator?.components(separatedBy: "---").count
+            == Renderer.maxTableColumns + 1)
+    }
+
     /// An all-empty `<tr>` pads to whitespace-only cells; text mode drops it
     /// like the Markdown branch does — two real rows yield two lines.
     @Test func textModeTablesSkipEmptyRows() {
