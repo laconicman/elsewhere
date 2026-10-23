@@ -54,6 +54,52 @@ struct ConfigStoreTests {
         }
     }
 
+    @Test func loadFileIsNilOnlyWhenAbsent() throws {
+        let store = store()
+        #expect(try store.loadFile() == nil)
+        try store.save(config())
+        #expect(try store.loadFile() == config())
+    }
+
+    @Test func unreadableFileThrowsConfigNotNil() throws {
+        guard getuid() != 0 else {
+            Issue.record("running as root — a 000 file is still readable; skipped")
+            return
+        }
+        let store = store()
+        let fileManager = FileManager.default
+        try fileManager.createDirectory(
+            at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: store.url)
+        try fileManager.setAttributes([.posixPermissions: 0o000], ofItemAtPath: store.url.path)
+        defer {
+            try? fileManager.setAttributes(
+                [.posixPermissions: 0o600], ofItemAtPath: store.url.path)
+        }
+        do {
+            _ = try store.loadFile()
+            Issue.record("expected a throw")
+        } catch ElsewhereError.config(let message) {
+            // "Cannot read" — never nil: `exits add` must not overwrite existing exits.
+            #expect(message.contains("cannot read"))
+        } catch {
+            Issue.record("expected .config, got \(error)")
+        }
+    }
+
+    @Test func loadFileNeverSeesTheEnvironment() throws {
+        let store = store()
+        // The env link synthesizes a config for load(environment:) only — loadFile is
+        // what mutations use, and it must stay blind to ELSEWHERE_LINK so a secret is
+        // never persisted under the reserved name `env`.
+        let env = ["ELSEWHERE_LINK": Synthetic.link]
+        #expect(try store.loadFile() == nil)
+        #expect(
+            try store.load(environment: env).exits == ["env": .link(Synthetic.link)])
+        try store.save(config())
+        #expect(try store.loadFile() == config())
+    }
+
     @Test func envLinkSynthesizesAnEnvExitAndIgnoresTheFile() throws {
         let store = store() // never saved — the file does not exist
         let config = try store.load(environment: ["ELSEWHERE_LINK": Synthetic.link])

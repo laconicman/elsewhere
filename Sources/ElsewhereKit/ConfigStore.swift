@@ -35,8 +35,32 @@ public struct ConfigStore: Sendable {
         if let link = environment["ELSEWHERE_LINK"], !link.isEmpty {
             return ElsewhereConfig(default: "env", exits: ["env": .link(link)])
         }
-        guard let data = try? Data(contentsOf: url) else {
+        guard let config = try loadFile() else {
             throw .config("no config at \(url.path); run `elsewhere exits add`")
+        }
+        return config
+    }
+
+    /// The file's config, or `nil` only when it is genuinely absent — a present-but-
+    /// unreadable or corrupt file throws `.config`, so a mutating command can never
+    /// mistake "cannot read" for "empty" and overwrite the exits already there.
+    ///
+    /// The environment is never consulted: mutations (`exits add`/`remove`/`default`)
+    /// call this so `ELSEWHERE_LINK`'s synthesized `env` exit can never be persisted.
+    public func loadFile() throws(ElsewhereError) -> ElsewhereConfig? {
+        guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+        let data: Data
+        do {
+            data = try Data(contentsOf: url)
+        } catch {
+            // The file may have vanished between the exists check and the read. (Cast
+            // inside, not `catch let … as NSError` — that pattern crashes SILGen in a
+            // typed-throws function.)
+            let nsError = error as NSError
+            guard nsError.domain == NSCocoaErrorDomain,
+                nsError.code == NSFileReadNoSuchFileError
+            else { throw .config("cannot read \(url.path): \(error.localizedDescription)") }
+            return nil
         }
         let config: ElsewhereConfig
         do {

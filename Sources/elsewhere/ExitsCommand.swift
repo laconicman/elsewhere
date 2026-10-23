@@ -64,16 +64,10 @@ struct ExitsAdd: AsyncParsableCommand {
             try ExitName.validate(name)
             let exit = try await resolvedExit()
 
-            var config: ElsewhereConfig
-            do throws(ElsewhereError) {
-                config = try options.store.load(environment: ProcessInfo.processInfo.environment)
-            } catch {
-                // Only "no config yet" starts a fresh one — a corrupt file must fail,
-                // not be silently overwritten.
-                guard case .config(let message) = error, message.hasPrefix("no config")
-                else { throw error }
-                config = ElsewhereConfig()
-            }
+            // `loadFile`, not `load(environment:)`: a mutation must never see — and so
+            // never persist — the ELSEWHERE_LINK-synthesized `env` exit. nil is the
+            // only case that starts a fresh config; unreadable/corrupt throws.
+            var config = try options.store.loadFile() ?? ElsewhereConfig()
             let first = config.exits.isEmpty
             config.exits[name] = exit
             if first || self.default { config.default = name }
@@ -150,7 +144,9 @@ struct ExitsRemove: AsyncParsableCommand {
 
     func run() async throws {
         try await reportingErrors { () async throws(ElsewhereError) in
-            var config = try options.store.load(environment: ProcessInfo.processInfo.environment)
+            guard var config = try options.store.loadFile() else {
+                throw .config("no config at \(options.store.url.path); run `elsewhere exits add`")
+            }
             guard config.exits.removeValue(forKey: name) != nil else {
                 throw .exit("no exit named '\(name)'")
             }
@@ -173,7 +169,9 @@ struct ExitsDefault: AsyncParsableCommand {
 
     func run() async throws {
         try await reportingErrors { () async throws(ElsewhereError) in
-            var config = try options.store.load(environment: ProcessInfo.processInfo.environment)
+            guard var config = try options.store.loadFile() else {
+                throw .config("no config at \(options.store.url.path); run `elsewhere exits add`")
+            }
             guard config.exits[name] != nil else {
                 throw .exit("no exit named '\(name)'")
             }
