@@ -12,8 +12,9 @@ struct FetchCommand: AsyncParsableCommand {
         discussion: """
         Defaults: GET, up to 10 redirects, 25 s timeout, a 5 MB body cap (truncated
         bodies are flagged), a Chrome User-Agent unless --user-agent says otherwise.
-        Private/local destinations are refused unless --allow-private. Exit status is
-        0 even on HTTP >= 400 — the status is data.
+        --timeout bounds the whole fetch, not a single read. Private/local
+        destinations are refused unless --allow-private. Exit status is 0 even on
+        HTTP >= 400 — the status is data.
         """
     )
 
@@ -33,7 +34,7 @@ struct FetchCommand: AsyncParsableCommand {
     @Option(help: "User-Agent override (default: the config's — Chrome unless changed).")
     var userAgent: String?
 
-    @Option(help: "Timeout in seconds (default 25).")
+    @Option(help: "Timeout in seconds — bounds the whole fetch, not a single read (default 25).")
     var timeout = 25
 
     @Option(help: "Save the body to this file instead of printing it.")

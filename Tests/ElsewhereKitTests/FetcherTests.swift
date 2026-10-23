@@ -99,6 +99,22 @@ struct FetcherTests {
         }
     }
 
+    /// `--timeout` bounds the whole fetch, not one read: a trickle beats every
+    /// per-read wait but the resource bound still fires at the limit.
+    @Test func aTricklingBodyHitsTheResourceTimeout() async throws {
+        try await withServerAndRoute { route, base in
+            var slow = request(base.appendingPathComponent("trickle"))
+            slow.timeout = .seconds(1)
+            let began = ContinuousClock.now
+            do {
+                _ = try await Fetcher.fetch(slow, via: route)
+                Issue.record("expected .fetch")
+            } catch ElsewhereError.fetch {
+                #expect(ContinuousClock.now - began < .seconds(3))
+            }
+        }
+    }
+
     @Test func headReturnsHeadersAndNoBody() async throws {
         try await withServerAndRoute { route, base in
             let result = try await Fetcher.fetch(

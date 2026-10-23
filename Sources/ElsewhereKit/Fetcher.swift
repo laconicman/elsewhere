@@ -218,8 +218,11 @@ public enum Fetcher {
         configuration.httpCookieAcceptPolicy = .never
         configuration.waitsForConnectivity = false
         let timeout = request.timeout.components
-        configuration.timeoutIntervalForRequest =
-            TimeInterval(timeout.seconds) + TimeInterval(timeout.attoseconds) / 1e18
+        let interval = TimeInterval(timeout.seconds)
+            + TimeInterval(timeout.attoseconds) / 1e18
+        configuration.timeoutIntervalForRequest = interval
+        // …and for the resource — `--timeout` bounds the whole fetch, not one read.
+        configuration.timeoutIntervalForResource = interval
         configuration.urlCache = nil
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }

@@ -119,9 +119,33 @@ final class TestHTTPServer: Sendable {
         case (_, "/cdn-cgi/trace"):
             send("200 OK", contentType: "text/plain",
                  body: Data(traceBody.utf8), headOnly: false, on: connection)
+        case (_, "/trickle"):
+            // A byte every 300 ms — every read makes it in time, so only the
+            // *resource* timeout can stop this fetch.
+            trickle(on: connection)
         default:
             send("404 Not Found", contentType: "text/plain",
                  body: Data("not found".utf8), headOnly: method == "HEAD", on: connection)
+        }
+    }
+
+    /// `Content-Length` promises a megabyte; the body arrives one byte every 300 ms
+    /// and stops when the client hangs up.
+    private static func trickle(on connection: NWConnection) {
+        let head = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+            + "Content-Length: 1000000\r\nConnection: close\r\n\r\n"
+        connection.send(content: Data(head.utf8), completion: .contentProcessed { error in
+            guard error == nil else { return }
+            sendTrickleByte(on: connection)
+        })
+    }
+
+    private static func sendTrickleByte(on connection: NWConnection) {
+        DispatchQueue.global().asyncAfter(deadline: .now() + 0.3) {
+            connection.send(content: Data([0x61]), completion: .contentProcessed { error in
+                guard error == nil else { return }
+                sendTrickleByte(on: connection)
+            })
         }
     }
 

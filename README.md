@@ -75,7 +75,8 @@ elsewhere run --exit moldova -- git clone https://…  # HTTP(S)_/ALL_PROXY expo
 lines, truncation and binary notices, the `HTTP <status>` note. `--json` prints the
 whole result object instead; `--head` prints status and headers; `--output FILE`
 saves the raw body. Defaults: GET, up to 10 redirects (each hop re-checked by the
-private-address guard), a 25 s timeout, a 5 MB body cap, and a Chrome User-Agent
+private-address guard), a 25 s timeout that bounds the *whole* fetch — a body that
+trickles a byte at a time still hits it — a 5 MB body cap, and a Chrome User-Agent
 (`--user-agent` overrides). HTTP ≥ 400 is a *result*, not a failure — exit stays 0;
 the status is data the agent reads. Private/local destinations are refused unless
 `--allow-private` — the tool reaches everywhere the tunnel does, so a mistyped URL
