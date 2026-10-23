@@ -121,17 +121,13 @@ struct FetchCommand: AsyncParsableCommand {
     }
 
     /// Renders the result: `--json` the object, `--head` the status line + headers,
-    /// `--output` the file, else the decoded — rendered and paged — body on
-    /// stdout, or the binary notice. `--head`/`--output` ignore `--format`; a
-    /// body TextDecoder declines is untouched by the renderer either way.
+    /// `--output` the file, else the body's `OutputBody` selection on stdout.
+    /// `--head`/`--output` ignore `--format`; a body TextDecoder declines is
+    /// untouched by the renderer either way.
     private func report(_ result: FetchResult) throws(ElsewhereError) {
-        let body = TextDecoder.decode(result.body, contentType: result.contentType)
-            .map { decoded in
-                Pager.slice(
-                    Renderer.render(decoded.text, contentType: result.contentType,
-                                    finalURL: result.finalURL, format: format),
-                    startIndex: startIndex, maxLength: maxLength)
-            }
+        let selection = OutputBody.select(
+            result, format: format,
+            startIndex: startIndex, maxLength: maxLength, head: head)
         if json {
             struct Payload: Encodable {
                 let url, finalURL: String
@@ -160,7 +156,7 @@ struct FetchCommand: AsyncParsableCommand {
                 truncated: result.truncated,
                 redirects: result.redirects.map(Redactor.redact(url:)),
                 headers: result.headers,
-                body: body)
+                body: OutputBody.json(selection, of: result))
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             do {
@@ -180,15 +176,18 @@ struct FetchCommand: AsyncParsableCommand {
                 throw .fetch("cannot write \(output): \(error.localizedDescription)")
             }
             printError("saved \(result.body.count) bytes to \(output)")
-        } else if format == .raw {
-            // The wire bytes — a 1251 page would corrupt through String round-trip.
-            FileHandle.standardOutput.write(result.body)
-        } else if let body {
-            FileHandle.standardOutput.write(Data(body.utf8))
         } else {
-            printError(
-                "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "
-                    + "pass --output FILE to save it")
+            switch selection {
+            case .bytes(let data):
+                // raw — the wire bytes, untouched.
+                FileHandle.standardOutput.write(data)
+            case .text(let body):
+                FileHandle.standardOutput.write(Data(body.utf8))
+            case .undecodable, .none:
+                printError(
+                    "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "
+                        + "pass --output FILE to save it")
+            }
         }
         if result.truncated {
             printError("body truncated at \(FetchLimits.maxBodyBytes / 1_000_000) MB")
