@@ -1,0 +1,42 @@
+{
+  "originHash" : "91ec7b16237e9774beaefd6cad9e15fc297b425d04bae73c5add6c9bdb94f717",
+  "pins" : [
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "6a52f3251125d74daf04fcbd5e6f08a75d074382",
+        "version" : "1.8.2"
+      }
+    },
+    {
+      "identity" : "swift-docc-plugin",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-docc-plugin",
+      "state" : {
+        "revision" : "647c708be89f834fa6a6d4945442793a77ddf5b6",
+        "version" : "1.5.0"
+      }
+    },
+    {
+      "identity" : "swift-docc-symbolkit",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swiftlang/swift-docc-symbolkit",
+      "state" : {
+        "revision" : "b45d1f2ed151d057b54504d653e0da5552844e34",
+        "version" : "1.0.0"
+      }
+    },
+    {
+      "identity" : "swift-libxray",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/laconicman/swift-libxray",
+      "state" : {
+        "revision" : "41aa178aa27c71c1274ef3ddd6070e8a747c2e78",
+        "version" : "0.1.0"
+      }
+    }
+  ],
+  "version" : 3
+}
