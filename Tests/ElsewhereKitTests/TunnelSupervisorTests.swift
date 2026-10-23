@@ -6,7 +6,7 @@ import XrayCore
 
 /// The engine lifecycle, driven for real: `run`/`stop` against loopback `mixed`
 /// inbounds. Serialized — the Go runtime is one per process.
-@Suite("TunnelSupervisor — start, retry, readiness, stop", .serialized)
+@Suite("TunnelSupervisor — start, retry, readiness, stop", .serialized, .engineGate)
 struct TunnelSupervisorTests {
     @Test func directOnlyStartThenStop() async throws {
         let supervisor = TunnelSupervisor()

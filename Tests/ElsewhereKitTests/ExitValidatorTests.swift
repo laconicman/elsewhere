@@ -5,7 +5,7 @@ import Testing
 /// The `exits add` gate: engine validation before save, and the stored shape is what
 /// `exits list` summarizes — an `xray` wrapper is stored unwrapped. Serialized: the Go
 /// runtime is one per process; `test` binds nothing (C5 §3).
-@Suite("ExitValidator — engine-checked at add, stored unwrapped", .serialized)
+@Suite("ExitValidator — engine-checked at add, stored unwrapped", .serialized, .engineGate)
 struct ExitValidatorTests {
     @Test func syntheticLinkValidatesAndStaysALink() async throws {
         let stored = try await ExitValidator.validate(.link(Synthetic.link), named: "moldova")

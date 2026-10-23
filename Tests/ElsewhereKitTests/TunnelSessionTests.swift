@@ -5,7 +5,9 @@ import Testing
 /// Which exits resolve to engine lanes and which need no engine at all (A9); the `.auto`
 /// unbound refusal (A8); `ExitSelection`'s name resolution. Engine-touching cases are
 /// serialized — the Go runtime is one per process.
-@Suite("TunnelSession — routes, no-engine proxy exits, auto refusal", .serialized, .temporaryDirectories)
+@Suite(
+    "TunnelSession — routes, no-engine proxy exits, auto refusal",
+    .serialized, .engineGate, .temporaryDirectories)
 struct TunnelSessionTests {
     private func config() -> ElsewhereConfig {
         ElsewhereConfig(exits: [
