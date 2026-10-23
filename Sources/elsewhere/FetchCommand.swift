@@ -189,10 +189,12 @@ struct FetchCommand: AsyncParsableCommand {
                 FileHandle.standardOutput.write(data)
             case .text(let body):
                 FileHandle.standardOutput.write(Data(body.utf8))
-            case .undecodable, .none:
+            case .undecodable:
                 printError(
                     "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "
                         + "pass --output FILE to save it")
+            case .none:
+                break // --head takes its own branch above; .none can't reach here
             }
         }
         if result.truncated {

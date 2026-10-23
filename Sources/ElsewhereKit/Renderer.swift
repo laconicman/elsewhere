@@ -1,14 +1,6 @@
 public import Foundation // URL is public API
 import SwiftSoup // the parser — never in the public surface (rule 1)
 
-/// `fetch`'s `--format` (§5.6): `markdown` is the default, `text` the same pipeline
-/// without the decorations, `raw` PR #2's byte-exact behaviour.
-public enum OutputFormat: String, Sendable, CaseIterable {
-    case markdown
-    case text
-    case raw
-}
-
 /// HTML → Markdown (§3.7, §5.6). One pass over SwiftSoup's DOM; the plumbing is
 /// small enough to live in one file. What lands on stdout:
 ///
@@ -268,11 +260,8 @@ extension Renderer {
             let absolute = (try? element.absUrl("href")) ?? href
             out.append(linkMarkdown(label, href: absolute))
             return out
-        case "br":
-            return []
-        case "img":
-            let text = inline(element, markdown: markdown, depth: depth)
-            return text.isEmpty ? [] : [text]
+        // No `br`/`img` arms: both are inline tags, so `blocks(of:)` routes them
+        // into a paragraph's inline run — they never reach `block()`.
         default:
             // A container (div, section, main, article, figure, details, dl, …) or an
             // unknown element: blocks inside become their own blocks, inline content
