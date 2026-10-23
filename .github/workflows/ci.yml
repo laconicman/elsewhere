@@ -1,0 +1,49 @@
+# Builds and tests the package on every PR and on main. Public repo: runner minutes are
+# free; the suite is offline (loopback only) by contract.
+#
+# The manifest is swift-tools-version 6.4, which ships with Xcode 27. `macos-26` tops out at
+# Xcode 26.6, so the job runs on GitHub's separate `xcode-27` image on its own toolchain,
+# as swift-libxray does.
+#
+# The engine arrives through swift-libxray's binary target — a 101 MB artifact download.
+# SwiftPM keeps the fetched zip in ~/Library/Caches/org.swift.swiftpm/artifacts (the
+# extracted copy under .build/artifacts is what the build reads), so both are cached keyed
+# on Package.resolved — that file carries the engine pin here, so hashing it can't drift
+# from the resolved version.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build and test
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Toolchain
+        run: swift --version
+
+      - name: Artifact cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/org.swift.swiftpm/artifacts
+            .build/artifacts
+          key: elsewhere-${{ hashFiles('Package.resolved') }}
+          restore-keys: elsewhere-
+
+      - name: Build
+        run: swift build
+
+      - name: Test
+        run: swift test
