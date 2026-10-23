@@ -142,7 +142,8 @@ struct ConfigStoreTests {
             _ = try store.load(environment: [:])
             Issue.record("expected a throw")
         } catch ElsewhereError.config(let message) {
-            #expect(message.contains("version 2"))
+            #expect(message.contains("version 2 is not supported"))
+            #expect(message.contains("understands version 1"))
         } catch {
             Issue.record("expected .config, got \(error)")
         }
@@ -197,7 +198,7 @@ struct ConfigStoreTests {
         let store = store()
         var bad = config()
         bad.exits["Bad_Name"] = .link(Synthetic.link)
-        // Saved by hand — save() cannot refuse an in-memory model, load() must.
+        // Written by hand — save() would refuse it; load() must too.
         let data = try JSONEncoder.with(bad)
         try FileManager.default.createDirectory(
             at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
@@ -206,7 +207,8 @@ struct ConfigStoreTests {
             _ = try store.load(environment: [:])
             Issue.record("expected a throw")
         } catch ElsewhereError.config(let message) {
-            #expect(message.contains("Bad_Name"))
+            // Names are never echoed — "invalid exit name" is the whole diagnostic.
+            #expect(message.contains("invalid exit name"))
         } catch {
             Issue.record("expected .config, got \(error)")
         }
@@ -221,5 +223,37 @@ struct ConfigStoreTests {
             at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
         try data.write(to: store.url)
         #expect(throws: ElsewhereError.self) { _ = try store.load(environment: [:]) }
+    }
+
+    @Test func saveValidatesBeforeWriting() throws {
+        let store = store()
+        // `env` is a reserved name — a save reaching for it must fail as .config
+        // before anything touches the file.
+        var bad = ElsewhereConfig(exits: ["env": .link(Synthetic.link)])
+        #expect(throws: ElsewhereError.self) { try store.save(bad) }
+        #expect(try store.loadFile() == nil)
+
+        bad = config()
+        bad.default = "missing"
+        #expect(throws: ElsewhereError.self) { try store.save(bad) }
+        #expect(try store.loadFile() == nil)
+    }
+
+    @Test func nilDefaultOmitsTheKey() throws {
+        let store = store()
+        var config = config()
+        config.default = nil
+        try store.save(config)
+        let text = try String(contentsOf: store.url, encoding: .utf8)
+        #expect(!text.contains("\"default\""))
+        #expect(try store.load(environment: [:]) == config)
+    }
+
+    @Test func saveLeavesNoTemporaryFileBehind() throws {
+        let store = store()
+        try store.save(config())
+        let leftovers = try FileManager.default.contentsOfDirectory(
+            atPath: store.url.deletingLastPathComponent().path)
+        #expect(leftovers == ["config.json"])
     }
 }

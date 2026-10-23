@@ -36,9 +36,15 @@ public struct ConfigStore: Sendable {
             return ElsewhereConfig(default: "env", exits: ["env": .link(link)])
         }
         guard let config = try loadFile() else {
-            throw .config("no config at \(url.path); run `elsewhere exits add`")
+            throw missingConfigError
         }
         return config
+    }
+
+    /// The one home for "no config" — `load` and the mutating commands all say it
+    /// the same way, with the path that was actually consulted.
+    public var missingConfigError: ElsewhereError {
+        .config("no config at \(url.path); run `elsewhere exits add`")
     }
 
     /// The file's config, or `nil` only when it is genuinely absent — a present-but-
@@ -102,13 +108,18 @@ public struct ConfigStore: Sendable {
         }
     }
 
-    /// Writes atomically into a 0700 directory and leaves the file 0600. The directory
-    /// is tightened *before* the write: `createDirectory` doesn't re-apply attributes
-    /// to a directory that already exists loose, and the atomic write's temp file must
-    /// never sit exposed in one.
+    /// Writes atomically into a 0700 directory — and the file exists only at 0600.
+    /// `data.write(.atomic)` + chmod leaves a window where the file is looser; instead
+    /// a same-directory temp is `createFile`d at 0600 outright and `rename(2)`d over
+    /// the destination (atomic on one volume), so there is no chmod at all. The
+    /// directory is still tightened *before* the temp lands in it. The config is
+    /// validated first: the invariants hold on write exactly as on read.
     public func save(_ config: ElsewhereConfig) throws(ElsewhereError) {
+        let config = try Self.validated(config)
         let fileManager = FileManager.default
         let directory = url.deletingLastPathComponent()
+        let temporary = directory
+            .appendingPathComponent(".\(url.lastPathComponent).\(UUID().uuidString).tmp")
         do {
             try fileManager.createDirectory(
                 at: directory,
@@ -117,9 +128,20 @@ public struct ConfigStore: Sendable {
             try fileManager.setAttributes(
                 [.posixPermissions: 0o700], ofItemAtPath: directory.path)
             let data = try JSONEncoder.with(config)
-            try data.write(to: url, options: .atomic)
-            try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
+            guard fileManager.createFile(
+                atPath: temporary.path, contents: data,
+                attributes: [.posixPermissions: 0o600])
+            else { throw ElsewhereError.config("cannot write \(temporary.path)") }
+            // rename(2), not moveItem — replace syscall, same volume, no loose window.
+            guard rename(temporary.path, url.path) == 0 else {
+                let detail = String(cString: strerror(errno))
+                try? fileManager.removeItem(at: temporary)
+                throw ElsewhereError.config("cannot write \(url.path): \(detail)")
+            }
+        } catch let error as ElsewhereError {
+            throw error
         } catch {
+            try? fileManager.removeItem(at: temporary)
             throw .config("cannot write \(url.path): \(error.localizedDescription)")
         }
     }
@@ -130,7 +152,7 @@ public struct ConfigStore: Sendable {
     static func validated(_ config: ElsewhereConfig) throws(ElsewhereError) -> ElsewhereConfig {
         guard config.version == 1 else {
             throw .config(
-                "config version \(config.version) is newer than this build understands")
+                "config version \(config.version) is not supported; this build understands version 1")
         }
         for name in config.exits.keys.sorted() {
             do throws(ElsewhereError) {

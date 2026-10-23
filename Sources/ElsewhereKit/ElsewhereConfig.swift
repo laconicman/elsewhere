@@ -38,6 +38,17 @@ public struct ElsewhereConfig: Codable, Sendable, Equatable {
         exits = try container.decodeIfPresent([String: Exit].self, forKey: .exits) ?? [:]
     }
 
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(version, forKey: .version)
+        // encodeIfPresent: an unset default leaves no "default" key in the file —
+        // the decoder tolerates absence, and a null reads as a value to a hand-editor.
+        try container.encodeIfPresent(`default`, forKey: .default)
+        try container.encode(bindInterface, forKey: .bindInterface)
+        try container.encode(userAgent, forKey: .userAgent)
+        try container.encode(exits, forKey: .exits)
+    }
+
     enum CodingKeys: String, CodingKey {
         case version, `default`, bindInterface, userAgent, exits
     }

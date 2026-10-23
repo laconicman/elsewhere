@@ -142,7 +142,7 @@ struct ExitsRemove: AsyncParsableCommand {
     func run() async throws {
         try await reportingErrors { () async throws(ElsewhereError) in
             guard var config = try options.store.loadFile() else {
-                throw .config("no config at \(options.store.url.path); run `elsewhere exits add`")
+                throw options.store.missingConfigError
             }
             guard config.exits.removeValue(forKey: name) != nil else {
                 throw .exit("no exit named '\(name)'")
@@ -167,7 +167,7 @@ struct ExitsDefault: AsyncParsableCommand {
     func run() async throws {
         try await reportingErrors { () async throws(ElsewhereError) in
             guard var config = try options.store.loadFile() else {
-                throw .config("no config at \(options.store.url.path); run `elsewhere exits add`")
+                throw options.store.missingConfigError
             }
             guard config.exits[name] != nil else {
                 throw .exit("no exit named '\(name)'")
