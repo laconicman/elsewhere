@@ -27,6 +27,23 @@ struct ExitValidatorTests {
         }
     }
 
+    @Test func aCredentialUnderAnUnknownKeyStaysOutOfTheError() async {
+        // `shape` is in neither secretKeys nor publicKeys — an 8-char credential would
+        // have survived pattern-scrubbing alone; the inverted enumeration covers it.
+        do {
+            _ = try await ExitValidator.validate(
+                .xray(.object([
+                    "protocol": .string("nonexistent"),
+                    "settings": .object(["shape": .string("abcdefgh")]),
+                ])), named: "bad")
+            Issue.record("expected a throw")
+        } catch ElsewhereError.engine(let message) {
+            #expect(!message.contains("abcdefgh"))
+        } catch {
+            Issue.record("expected .engine, got \(error)")
+        }
+    }
+
     @Test func wrappedOutboundIsStoredUnwrapped() async throws {
         let inner = try RedactorTests.json(RedactorTests.flatOutbound)
         let stored = try await ExitValidator.validate(

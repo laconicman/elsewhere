@@ -74,17 +74,34 @@ public enum Redactor {
         }
     }
 
-    /// The string values under every `secretKeys` member anywhere in the JSON —
-    /// the secrets a resolved outbound carries, for `scrub(_:secrets:)` on engine
-    /// messages that can echo config text back.
+    /// Keys whose string values are structural — protocol, transport, routing — never
+    /// credentials. `secrets(in:)` treats everything NOT listed here as a potential
+    /// secret: an outbound can carry a credential under a key nobody anticipated, and
+    /// a short value survives `scrubPatterns`' 32-char net. The `error`/`loglevel` keys
+    /// are Xray's `log` object; `access`/`error` there name file sinks, not secrets.
+    static let publicKeys: Set<String> = [
+        "protocol", "tag", "network", "security", "address", "serverName", "sni",
+        "fingerprint", "fp", "flow", "encryption", "method", "mode", "path", "host",
+        "type", "headerType", "alpn", "domainStrategy", "interface", "listen",
+        "outboundTag", "inboundTag", "sendThrough", "loglevel", "access", "error",
+    ]
+
+    /// The secret values anywhere in the JSON, for `scrub(_:secrets:)` on engine
+    /// messages that can echo config text back. The enumeration is inverted from
+    /// display: `secretKeys` members collect at any length, and every string leaf
+    /// of ≥ 4 chars under a key outside `publicKeys` collects too — **unknown key
+    /// → secret**, never the reverse. Keys inside arrays of objects (`users`,
+    /// `vnext`, `servers`) recurse as usual.
     static func secrets(in json: JSONValue) -> [String] {
         switch json {
         case .object(let object):
             object.flatMap { key, value in
-                if secretKeys.contains(key), case .string(let secret) = value, !secret.isEmpty {
-                    return [secret]
+                guard case .string(let secret) = value else {
+                    return secrets(in: value)
                 }
-                return secrets(in: value)
+                if secretKeys.contains(key), !secret.isEmpty { return [secret] }
+                if !publicKeys.contains(key), secret.count >= 4 { return [secret] }
+                return []
             }
         case .array(let array):
             array.flatMap(secrets(in:))

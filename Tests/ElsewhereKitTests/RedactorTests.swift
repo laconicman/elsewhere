@@ -190,4 +190,28 @@ struct RedactorTests {
         #expect(found.contains(Synthetic.sid))
         #expect(!found.contains("proxy.example.com"))
     }
+
+    @Test func anUnknownKeyCountsAsSecret() throws {
+        // `weirdKey` is in neither list — the scrub enumeration still takes its value:
+        // a credential can hide under a key nobody anticipated. Structural values
+        // (address → publicKeys) and sub-4-char strings stay uncollected.
+        let outbound = try Self.json("""
+            {"protocol":"vless","settings":{"address":"h","port":1,"weirdKey":"s3cr3t","tiny":"abc"}}
+            """)
+        let found = Set(Redactor.secrets(in: outbound))
+        #expect(found.contains("s3cr3t"))
+        #expect(!found.contains("h"))
+        #expect(!found.contains("abc"))
+    }
+
+    @Test func anUnknownKeyValueScrubsFromEngineText() throws {
+        let outbound = try Self.json("""
+            {"protocol":"vless","settings":{"address":"h","port":1,"weirdKey":"s3cr3t"}}
+            """)
+        // "s3cr3t" is 6 chars — scrubPatterns' URL/UUID/32-run net would miss it; the
+        // enumeration catches it.
+        let scrubbed = Redactor.scrub(
+            "bad value s3cr3t for h", secrets: Redactor.secrets(in: outbound))
+        #expect(scrubbed == "bad value … for h")
+    }
 }

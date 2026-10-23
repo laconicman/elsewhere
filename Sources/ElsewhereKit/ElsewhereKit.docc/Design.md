@@ -109,6 +109,11 @@ an in-memory `env` exit and the file is never read — the ad-hoc path for agent
 are reserved. **Rejected:** CLI-only link flags for the common case (the link in shell
 history), and a default-on `direct` exit row in the file (it's code, not config).
 
+Scrubbing inverts the enumeration too: for error text, every string leaf under an
+unknown key counts as a secret (≥ 4 chars) — only `Redactor`'s `publicKeys` allowlist
+of structural values stays collectible-free. Display redaction keeps the key-based
+`secretKeys` list; the two paths answer different questions.
+
 ## Exit names are routing tags
 
 A name must match `^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$` — DNS-label-shaped: the
