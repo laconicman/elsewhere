@@ -15,7 +15,7 @@ public enum Pager {
         let total = text.count // Characters — the unit the contract is in
         let start = Swift.max(0, startIndex)
         guard start < total else {
-            return "<elsewhere:truncated next_start_index=\(total) total=\(total)>"
+            return "<elsewhere:truncated next_start_index=\(total) total=\(total)>\n"
         }
         let remaining = total - start
         guard maxLength > 0 else {
@@ -25,7 +25,7 @@ public enum Pager {
         var out = String(text.dropFirst(start).prefix(take))
         if take < remaining {
             let next = start + take
-            out += "\n<elsewhere:truncated next_start_index=\(next) total=\(total)>"
+            out += "\n<elsewhere:truncated next_start_index=\(next) total=\(total)>\n"
         }
         return out
     }

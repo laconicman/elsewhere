@@ -76,6 +76,12 @@ struct FetchCommand: AsyncParsableCommand {
         if timeout <= 0 {
             throw ValidationError("--timeout wants a positive number of seconds")
         }
+        if startIndex < 0 {
+            throw ValidationError("--start-index wants a non-negative index")
+        }
+        if maxLength < 0 {
+            throw ValidationError("--max-length wants a non-negative count")
+        }
     }
 
     func run() async throws {

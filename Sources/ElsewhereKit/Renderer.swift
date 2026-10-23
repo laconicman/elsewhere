@@ -263,9 +263,10 @@ extension Renderer {
             let text = trimBlock(inlineChildren(element, markdown: false,
                                                 depth: depth))
                 .replacingOccurrences(of: "\n", with: " ")
-            let label = text.isEmpty ? "link" : String(text.prefix(80))
+            let label = escapeBrackets(
+                text.isEmpty ? "link" : String(text.prefix(80)))
             let absolute = (try? element.absUrl("href")) ?? href
-            out.append("[\(label)](\(absolute))")
+            out.append(linkMarkdown(label, href: absolute))
             return out
         case "br":
             return []
@@ -435,12 +436,31 @@ extension Renderer {
 
     /// Does `href` name a destination the output may make actionable? A relative
     /// reference has no scheme — it resolves against the page and is fine; an
-    /// explicit scheme outside the allowlist renders as text alone.
+    /// explicit scheme outside the allowlist renders as text alone. An href
+    /// `URLComponents` cannot parse is not a link either — the "relative" guess
+    /// is optimistic for a malformed destination.
     static func isLinkable(_ href: String, schemes: Set<String>) -> Bool {
-        guard !href.isEmpty else { return false }
-        guard let scheme = URLComponents(string: href)?.scheme?.lowercased()
-        else { return true }
+        guard !href.isEmpty, let components = URLComponents(string: href)
+        else { return false }
+        guard let scheme = components.scheme?.lowercased() else { return true }
         return schemes.contains(scheme)
+    }
+
+    /// `[label](dest)` with `<dest>` form when the destination carries spaces
+    /// or parens — either would break the syntax it lives inside. Brackets in
+    /// the label escape at the text node (`escapeBrackets`), so generated
+    /// markup — `![alt](src)` inside a link is legal CommonMark — survives.
+    private static func linkMarkdown(_ label: String, href: String) -> String {
+        let dest = href.contains(" ") || href.contains("(") || href.contains(")")
+            ? "<\(href)>" : href
+        return "[\(label)](\(dest))"
+    }
+
+    /// `[`/`]` in text destined for a link label escape; the label is the only
+    /// context where a bare bracket opens markup the author never wrote.
+    private static func escapeBrackets(_ text: String) -> String {
+        text.replacingOccurrences(of: "[", with: "\\[")
+            .replacingOccurrences(of: "]", with: "\\]")
     }
 
     /// The longest run of `` ` `` in `text` — a delimiter must be one longer.
@@ -560,8 +580,15 @@ extension Renderer {
     /// Everything inside one element as inline Markdown. Text nodes collapse —
     /// never trim — so a sibling keeps its boundary spaces; the edges trim at the
     /// block level. Past `maxDepth` the subtree is its collapsed text.
-    private static func inline(_ node: Node, markdown: Bool, depth: Int) -> String {
-        if let text = node as? TextNode { return collapse(text.text()) }
+    /// `inLinkLabel` escapes `[`/`]` in text only — an `a`'s children are a link
+    /// label, and a bare bracket there would close it early.
+    private static func inline(
+        _ node: Node, markdown: Bool, depth: Int, inLinkLabel: Bool = false
+    ) -> String {
+        if let text = node as? TextNode {
+            let collapsed = collapse(text.text())
+            return inLinkLabel ? escapeBrackets(collapsed) : collapsed
+        }
         guard let element = node as? Element else { return "" }
         guard depth < maxDepth else { return subtreeText(element, whole: false) }
         switch element.tagName().lowercased() {
@@ -579,7 +606,8 @@ extension Renderer {
             return fence + (padded ? " " : "") + content + (padded ? " " : "") + fence
         case "a":
             let content = trimBlock(
-                inlineChildren(element, markdown: markdown, depth: depth))
+                inlineChildren(
+                    element, markdown: markdown, depth: depth, inLinkLabel: true))
             guard markdown else { return content }
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -588,7 +616,7 @@ extension Renderer {
                 Self.isLinkable(href, schemes: Self.linkableSchemes)
             else { return content }
             let absolute = (try? element.absUrl("href")) ?? href
-            return "[\(content)](\(absolute))"
+            return linkMarkdown(content, href: absolute)
         case "img":
             let alt = ((try? element.attr("alt")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -617,13 +645,17 @@ extension Renderer {
     /// context still separates: `<td><p>alpha</p><p>beta</p></td>` is
     /// "alpha beta", not "alphabeta".
     private static func inlineChildren(
-        _ element: Element, markdown: Bool, depth: Int
+        _ element: Element, markdown: Bool, depth: Int, inLinkLabel: Bool = false
     ) -> String {
         collapseLines(element.getChildNodes().map { node in
             if let child = node as? Element, isBlock(child, depth: depth + 1) {
-                return " " + inline(child, markdown: markdown, depth: depth + 1) + " "
+                return " " + inline(
+                    child, markdown: markdown, depth: depth + 1,
+                    inLinkLabel: inLinkLabel) + " "
             }
-            return inline(node, markdown: markdown, depth: depth + 1)
+            return inline(
+                node, markdown: markdown, depth: depth + 1,
+                inLinkLabel: inLinkLabel)
         }.joined())
     }
 

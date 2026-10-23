@@ -173,6 +173,21 @@ struct RendererTests {
         #expect(rendered.contains("[m](mailto:a@b.c)"))
     }
 
+    /// `[`/`]` in link text escape; a destination with parens takes the `<dest>`
+    /// form; an href `URLComponents` cannot parse is text, not a link.
+    @Test func linksEscapeBracketsAndOddHrefsAreNotLinks() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"/u\">a]b</a> <a href=\"/x(1)\">p</a> "
+                + "<a href=\"java\tscript:bad()\">t</a></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("[a\\]b](https://example.com/u)"))
+        #expect(rendered.contains("[p](<https://example.com/x(1)>)"))
+        // A tab in the scheme makes the href unparseable — text, never a link.
+        #expect(rendered.contains(" t\n") || rendered.hasSuffix(" t"))
+        #expect(!rendered.contains("[t]("))
+    }
+
     /// A link wrapping block children can't inline-wrap them — the blocks stay
     /// and the destination survives as a link line of the `a`'s own text.
     @Test func aLinkWrappingBlocksKeepsItsDestination() {
