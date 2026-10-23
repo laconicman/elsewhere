@@ -30,6 +30,10 @@ public enum Renderer {
     static let jsShellNote =
         "_Note: this page appears to be rendered by JavaScript; "
         + "the HTML shell carried little content._"
+    /// The same note for `text` — no emphasis markers in plain text.
+    static let jsShellNotePlain =
+        "Note: this page appears to be rendered by JavaScript; "
+        + "the HTML shell carried little content."
 
     /// - Parameters:
     ///   - text: the decoded body (`TextDecoder` decides text vs binary earlier).
@@ -64,7 +68,8 @@ public enum Renderer {
         var body = blocks.joined(separator: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if hadExternalScripts, body.count < jsShellThreshold {
-            body = body.isEmpty ? jsShellNote : body + "\n\n" + jsShellNote
+            let note = markdown ? jsShellNote : jsShellNotePlain
+            body = body.isEmpty ? note : body + "\n\n" + note
         }
 
         var out: [String] = []
@@ -159,16 +164,19 @@ extension Renderer {
             return ["- " + inline(element, markdown: markdown)]
         case "blockquote":
             let inner = blocks(of: element, markdown: markdown)
-                .joined(separator: "\n\n")
-            guard !inner.isEmpty else { return [] }
-            return [inner.split(separator: "\n", omittingEmptySubsequences: false)
+            // `> ` is a Markdown delimiter — plain text keeps the paragraphs bare.
+            guard markdown else { return inner }
+            let joined = inner.joined(separator: "\n\n")
+            guard !joined.isEmpty else { return [] }
+            return [joined.split(separator: "\n", omittingEmptySubsequences: false)
                 .map { $0.isEmpty ? ">" : "> \($0)" }.joined(separator: "\n")]
         case "pre":
             return [preBlock(element, markdown: markdown)]
         case "table":
             return table(element, markdown: markdown)
         case "hr":
-            return ["---"]
+            // `---` is a Markdown delimiter — a rule just separates two blocks.
+            return markdown ? ["---"] : []
         case "br":
             return []
         case "img":
@@ -256,19 +264,29 @@ extension Renderer {
         func cells(_ row: Element) -> [String] {
             (try? row.select("th, td"))?.map { cell in
                 inline(cell, markdown: markdown)
-                    .replacingOccurrences(of: "|", with: "\\|")
                     .replacingOccurrences(of: "\n", with: " ")
             } ?? []
+        }
+        func gfmCells(_ row: Element) -> [String] {
+            cells(row).map { $0.replacingOccurrences(of: "|", with: "\\|") }
+        }
+        if !markdown {
+            // Plain text has no pipes: one line per row, two spaces between cells.
+            let lines = rows.compactMap { row -> String? in
+                let line = cells(row).joined(separator: "  ")
+                return line.isEmpty ? nil : line
+            }
+            return lines.isEmpty ? [] : [lines.joined(separator: "\n")]
         }
         let headerIndex = rows.firstIndex { row in
             ((try? row.select("th"))?.first()) != nil
         } ?? 0
-        let header = cells(rows[headerIndex])
+        let header = gfmCells(rows[headerIndex])
         guard !header.isEmpty else { return [] }
         var lines = ["| " + header.joined(separator: " | ") + " |"]
         lines.append("|" + String(repeating: "---|", count: header.count))
         for (index, row) in rows.enumerated() where index != headerIndex {
-            let body = cells(row)
+            let body = gfmCells(row)
             if !body.isEmpty {
                 lines.append("| " + body.joined(separator: " | ") + " |")
             }

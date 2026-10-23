@@ -33,20 +33,16 @@ Inline code with a backtick: a`b — needs double ticks.
 
 Quote & table
 
-> Quoted line one
->
-> Quoted line two
+Quoted line one
 
-| Name | Value |
-|---|---|
-| a\|b | 1 |
-| multi line | 2 |
+Quoted line two
 
-| r1c1 | r1c2 |
-|---|---|
-| r2c1 | r2c2 |
+Name  Value
+a|b  1
+multi line  2
 
----
+r1c1  r1c2
+r2c1  r2c2
 
 Images & odd links
 

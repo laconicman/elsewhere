@@ -285,4 +285,34 @@ struct RendererTests {
         #expect(!rendered.contains("`"))
         #expect(rendered.contains("Source: https://example.com"))
     }
+
+    /// `text` keeps block structure but every Markdown delimiter is gone: `> `,
+    /// pipes, `---`, emphasis underscores.
+    @Test func textHasNoMarkdownDelimiters() {
+        let rendered = Renderer.render(
+            "<body><blockquote><p>quoted</p></blockquote>"
+                + "<table><tr><th>a</th><th>b</th></tr>"
+                + "<tr><td>1</td><td>2</td></tr></table>"
+                + "<hr><p>end</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .text)
+        #expect(rendered.hasPrefix("quoted")) // no title → the body leads
+        #expect(!rendered.contains("> "))
+        #expect(rendered.contains("a  b")) // a row per line, two-space cells
+        #expect(rendered.contains("1  2"))
+        #expect(!rendered.contains("|"))   // no pipes, no separator row
+        #expect(!rendered.contains("---")) // the rule drops
+        #expect(rendered.contains("end"))
+    }
+
+    /// The JS-shell note has no emphasis markers in `text`.
+    @Test func textShellNoteDropsTheEmphasis() {
+        let rendered = Renderer.render(
+            "<html><head><script src=\"/app.js\"></script></head>"
+                + "<body><div id=\"root\"></div></body></html>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .text)
+        #expect(rendered.contains(Renderer.jsShellNotePlain))
+        #expect(!rendered.contains("_Note"))
+    }
 }
