@@ -23,6 +23,8 @@ let package = Package(
         .macOS(.v15),
     ],
     products: [
+        // The tool: `elsewhere fetch|whoami|run|exits|doctor|serve`.
+        .executable(name: "elsewhere", targets: ["elsewhere"]),
         // The façade: config, exits, Xray config generation, lifecycle, guards — every
         // surface (CLI now, MCP later) shares it.
         .library(name: "ElsewhereKit", targets: ["ElsewhereKit"]),
@@ -40,6 +42,16 @@ let package = Package(
         .target(
             name: "ElsewhereKit",
             dependencies: [.product(name: "XrayCore", package: "swift-libxray")],
+            swiftSettings: upcoming
+        ),
+        // The `elsewhere` binary: ArgumentParser glue only — the logic is the Kit's
+        // (deepwiki-mcp's untested-executable lesson).
+        .executableTarget(
+            name: "elsewhere",
+            dependencies: [
+                "ElsewhereKit",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
             swiftSettings: upcoming
         ),
         // Offline suite: loopback only, fixtures copied verbatim. `XrayCore` is a direct

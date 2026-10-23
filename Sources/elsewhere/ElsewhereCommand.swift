@@ -1,0 +1,69 @@
+import ArgumentParser
+import ElsewhereKit
+import Foundation
+
+/// `elsewhere` — the thin CLI face over ``ElsewhereKit``: argument parsing here, every
+/// decision in the Kit so the MCP server (M2) shares it.
+@main
+struct ElsewhereCommand: AsyncParsableCommand {
+    static let configuration = CommandConfiguration(
+        commandName: "elsewhere",
+        abstract: "Fetch it from elsewhere: read URLs through your own VLESS/Xray tunnel, with named exits and a direct path.",
+        discussion: """
+        Config: --config PATH > ELSEWHERE_CONFIG > \
+        ~/Library/Application Support/elsewhere/config.json.
+        ELSEWHERE_LINK alone synthesizes one in-memory exit named `env` for ad-hoc use.
+
+        Planned commands, not in this build: fetch, whoami, run; `serve` (MCP) in M2.
+
+        Exit status (stable; scripts may rely on it):
+        \(ExitStatus.help)
+        """,
+        version: Elsewhere.version,
+        subcommands: [ExitsCommand.self, DoctorCommand.self]
+    )
+}
+
+/// Every subcommand's `--config PATH`, resolved once the same way (§5.2 precedence).
+struct GlobalOptions: ParsableArguments {
+    @Option(help: "Config file; default ~/Library/Application Support/elsewhere/config.json, or $ELSEWHERE_CONFIG.")
+    var config: String?
+
+    /// The resolved store — the flag beats the env var, which beats the default path.
+    var store: ConfigStore {
+        ConfigStore(url: ConfigStore.resolveURL(
+            explicit: config, environment: ProcessInfo.processInfo.environment))
+    }
+}
+
+/// Writes `line` to stdout at once. `print` is block-buffered when stdout is a pipe or a
+/// file, so a reader waiting on a line would wait for the process to end.
+func emit(_ line: String) {
+    FileHandle.standardOutput.write(Data((line + "\n").utf8))
+}
+
+/// Writes `elsewhere: <message>` to stderr.
+func printError(_ message: String) {
+    FileHandle.standardError.write(Data("elsewhere: \(message)\n".utf8))
+}
+
+/// Runs `body`, printing an ``ElsewhereError`` to stderr and exiting with its documented
+/// status (the `sysexits` table — a contract, per CLAUDE.md).
+func reportingErrors(_ body: () async throws(ElsewhereError) -> Void) async throws {
+    try await exitingWithStatus { () async throws(ElsewhereError) -> Int32 in
+        try await body()
+        return 0
+    }
+}
+
+/// Runs `body` and exits with the status it returns, or with an ``ElsewhereError``'s.
+func exitingWithStatus(_ body: () async throws(ElsewhereError) -> Int32) async throws {
+    let code: Int32
+    do {
+        code = try await body()
+    } catch {
+        printError(error.localizedDescription)
+        throw ExitCode(error.exitStatus)
+    }
+    if code != 0 { throw ExitCode(code) }
+}
