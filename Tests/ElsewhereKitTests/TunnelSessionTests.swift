@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import XrayCore
 @testable import ElsewhereKit
 
 /// Which exits resolve to engine lanes and which need no engine at all (A9); the `.auto`
@@ -87,6 +88,36 @@ struct TunnelSessionTests {
         } catch is ElsewhereError {
         }
         await directOnly.close()
+    }
+
+    /// Devin #2: a broken exit is isolated — `open` succeeds, the healthy route
+    /// works, the broken one rethrows its recorded error, and with nothing valid
+    /// for the engine, none was started.
+    @Test func aBrokenExitIsIsolatedToItsRoute() async throws {
+        let supervisor = TunnelSupervisor()
+        let config = ElsewhereConfig(exits: [
+            "broken": .link("vless://not-a-real-link"),
+            "via": .proxy(URL(string: "http://127.0.0.1:18080")!),
+        ])
+        let session = try await TunnelSession.open(
+            config: config, exits: ["broken", "via"], includeDirect: false,
+            bindInterface: .none, log: .silent, supervisor: supervisor)
+        guard case .external = try await session.route(for: "via") else {
+            Issue.record("the proxy exit lost its route to a broken sibling")
+            return
+        }
+        do {
+            _ = try await session.route(for: "broken")
+            Issue.record("the broken exit routed")
+        } catch {
+            switch error {
+            case .engine, .exit: break
+            default: Issue.record("expected .engine/.exit, got \(error)")
+            }
+        }
+        #expect(!(await supervisor.isUp))
+        #expect(!(await XrayCore.shared.isRunning))
+        await session.close()
     }
 
     @Test func unknownExitNamesAreExitErrors() async {

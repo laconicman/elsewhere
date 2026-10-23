@@ -34,8 +34,10 @@ public enum ExitValidator {
 
     /// A candidate config — this outbound plus `direct`, silent log, unbound — run
     /// through the engine's own validator (`test` binds nothing, C5 §3). `freePorts`
-    /// failure is `.engine` too: no ports, no validation.
-    private static func assertBuildable(
+    /// failure is `.engine` too: no ports, no validation. Internal, not private:
+    /// `TunnelSession` gates each exit through the same check so one bad outbound
+    /// is isolated instead of sinking `open`.
+    static func assertBuildable(
         _ outbound: JSONValue, named name: String, secrets: [String]
     ) async throws(ElsewhereError) {
         let ports: [UInt16]
