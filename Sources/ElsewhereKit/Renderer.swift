@@ -1,8 +1,8 @@
 public import Foundation // URL is public API
 import SwiftSoup // the parser — never in the public surface (rule 1)
 
-/// HTML → Markdown (§3.7, §5.6). One pass over SwiftSoup's DOM; the plumbing is
-/// small enough to live in one file. What lands on stdout:
+/// HTML → Markdown (§3.7, §5.6). A walk over SwiftSoup's DOM; the plumbing lives
+/// in one file. What lands on stdout:
 ///
 ///     # <title>          (only when the document carries one)
 ///

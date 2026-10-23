@@ -154,11 +154,13 @@ heavier than the contract needs.
 
 `fetch --format markdown` renders HTML to Markdown for the agent's eyes. The field
 of Swift HTML→Markdown libraries is tiny — the plan's survey (§3.7) found every
-candidate at ≤ 18★ and unmaintained — so the renderer is ~300 lines over
-**SwiftSoup**, the long-lived jsoup port already trusted for parsing, and the
-block/inline rules are ours to tune (TD-6). The reader is a language model, which
+candidate at ≤ 18★ and unmaintained — so the renderer is a hand-written walk
+over **SwiftSoup**, the long-lived jsoup port already trusted for parsing, and
+the block/inline rules are ours to tune (TD-6). The reader is a language model,
+which
 shapes two decisions. **Escaping is minimal:** only a text node that would open a
-block (`#`, `- `, `> `, `1. ` at line start) and `|` in table cells get a
+block (`#`, `- `, `> `, `1. ` at line start), `|` in table cells, and `[`/`]`
+inside a link label get a
 backslash — over-escaping hurts an agent's readability more than the rare literal
 marker it prevents. **The JavaScript-shell note is honest:** when a page carried
 `script[src]`s but renders under 200 characters, `fetch` appends
@@ -169,7 +171,10 @@ little content._` — a shell pretending to be content is worse than a named lim
 output never turns a non-web scheme into an actionable link; an `img` whose
 `src` is not http(s) renders as its alt. Rendering applies only to what
 `TextDecoder` calls text: a trace body or a JSON
-document passes through byte-exact for every format, and `raw` always is. Fixtures
+document's decoded text passes through unchanged for every format — only `raw`
+is wire-exact. The content sniff — `looksLikeHTML` judging the body's opening
+when no Content-Type arrived — is defensive: a nil Content-Type never reaches
+the renderer in today's fetch path. Fixtures
 are captured pages, one per shape — a GitHub README, a Wikipedia article, an Apple
 Documentation SPA shell — plus a hand-written `constructs.html` carrying every
 construct; provenance and licences live in
@@ -184,6 +189,9 @@ sequence is never split — and a page that leaves a remainder ends with
 `<elsewhere:truncated next_start_index=N total=T>`. `startIndex` past the end
 returns the marker alone (nothing more to read is information, not an error), and
 the CLI default of 0 means unlimited while M2's tool gets the agent-friendly 5000.
+The marker and the `Source:` footer are plain text a fetched page could imitate —
+accepted: the reader is an agent, and `--json` is the machine-readable channel
+when the distinction matters.
 
 ## Signals cancel the work; the exit is 128 + the signal
 

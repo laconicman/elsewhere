@@ -98,7 +98,8 @@ every format. `--head` and `--output` ignore `--format`.
 default) and ends a cut page with
 `<elsewhere:truncated next_start_index=M total=T>`; `--start-index M` reads on from
 there. Cuts never split an emoji or a combining sequence — the unit is the
-`Character`, not the byte. Paging applies to rendered text; raw is the bytes.
+`Character`, not the byte. Both flags reject negative values. Paging applies to
+rendered text; raw is the bytes.
 
 Known limitation: a JavaScript SPA's HTML shell carries little content — when a
 page had external scripts but renders under 200 characters, `fetch` appends

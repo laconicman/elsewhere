@@ -14,14 +14,14 @@ while INCY is connected; `run -- curl` and `run -- git clone` work through an ex
 `exits`/`doctor` redact; renderer fixtures green. Everything but the owner's live
 spike session (S5, issue #1) is landed — **M2 is next.**
 
-- **PR #1:** the Kit model — config, exits, redaction, the generated Xray config —
+- **#11:** the Kit model — config, exits, redaction, the generated Xray config —
   plus `exits` and `doctor`, and the house files.
-- **PR #2 (this one)** ([#7](https://github.com/laconicman/elsewhere/issues/7)):
+- **#12** ([#7](https://github.com/laconicman/elsewhere/issues/7)):
   `TunnelSupervisor` (lifecycle guards, stop + fresh ports + one retry per Design),
   `TunnelSession`, `Fetcher` with the private-address guard and the redirect policy,
   `TextDecoder`, `WhoAmI`/`Trace`, `ChildRunner` — and the `fetch`/`whoami`/`run`
   commands with the signal contract.
-- **PR #3 (this one)** ([#8](https://github.com/laconicman/elsewhere/issues/8)):
+- **#13** ([#8](https://github.com/laconicman/elsewhere/issues/8)):
   `Renderer` (HTML → Markdown via SwiftSoup), `Pager` with the truncation marker,
   `fetch --format/--max-length/--start-index`, saved-page fixtures and goldens.
 - [#1](https://github.com/laconicman/elsewhere/issues/1) the S4/S5 live spikes with the
