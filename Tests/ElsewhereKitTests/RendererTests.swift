@@ -146,6 +146,22 @@ struct RendererTests {
         #expect(rendered.contains("![a](https://example.com/dir/i.png)"))
     }
 
+    /// `..` climbs, `//host` borrows the scheme, and `<base href>` rebases every
+    /// relative URL in the document.
+    @Test func dotDotSchemeRelativeAndBaseHrefsResolve() {
+        let url = URL(string: "https://example.com/dir/sub/page")!
+        let rendered = Renderer.render(
+            #"<body><p><a href="../x">up</a> <a href="//cdn.example/i">cdn</a></p></body>"#,
+            contentType: "text/html", finalURL: url, format: .markdown)
+        #expect(rendered.contains("[up](https://example.com/dir/x)"))
+        #expect(rendered.contains("[cdn](https://cdn.example/i)"))
+        let rebased = Renderer.render(
+            #"<html><head><base href="https://base.example/sub/"></head>"#
+                + #"<body><p><a href="x">b</a></p></body></html>"#,
+            contentType: "text/html", finalURL: url, format: .markdown)
+        #expect(rebased.contains("[b](https://base.example/sub/x)"))
+    }
+
     @Test func javascriptAndAnchorLinksDropTheirSyntax() {
         let rendered = Renderer.render(
             ##"<body><p><a href="javascript:x()">go</a> <a href="#frag">jump</a> <a href="https://e.com"></a></p></body>"##,
@@ -555,6 +571,20 @@ struct RendererTests {
                 + "</p></body></html>",
             contentType: "text/html", finalURL: url, format: .markdown)
         #expect(!full.contains(Renderer.jsShellNote))
+    }
+
+    /// The threshold is `< 200`: a 199-character shell gets the note, a
+    /// 200-character body is content — the boundary itself is the test.
+    @Test func theShellThresholdBoundaryIsExact() {
+        let url = URL(string: "https://example.com")!
+        func shell(_ bodyChars: Int) -> String {
+            Renderer.render(
+                #"<html><head><script src="app.js"></script></head><body><p>"#
+                    + String(repeating: "x", count: bodyChars) + "</p></body></html>",
+                contentType: "text/html", finalURL: url, format: .markdown)
+        }
+        #expect(shell(Renderer.jsShellThreshold - 1).contains(Renderer.jsShellNote))
+        #expect(!shell(Renderer.jsShellThreshold).contains(Renderer.jsShellNote))
     }
 
     @Test func whitespaceCollapsesWithinAndBetweenBlocks() {
