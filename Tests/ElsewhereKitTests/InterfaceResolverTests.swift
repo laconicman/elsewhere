@@ -16,4 +16,9 @@ struct InterfaceResolverTests {
         #expect(await InterfaceResolver.resolve(.none) == nil)
         #expect(await InterfaceResolver.resolve(.named("en42")) == "en42")
     }
+
+    @Test func existsMatchesTheKernel() {
+        #expect(!InterfaceResolver.exists("nonexistent0"))
+        #expect(InterfaceResolver.exists("lo0"))
+    }
 }

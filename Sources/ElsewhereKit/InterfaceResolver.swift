@@ -1,3 +1,4 @@
+import Darwin
 import Network
 import Synchronization
 
@@ -54,6 +55,13 @@ public enum InterfaceResolver {
         } onCancel: {
             finishBox.withLock { $0 }?(nil)
         }
+    }
+
+    /// True when the kernel knows the interface name — `if_nametoindex(3)`
+    /// (Darwin `net/if.h`). `doctor` checks a `.named` binding this way: a typo'd
+    /// `bindInterface` is a warning now, not a bind failure at tunnel start.
+    public static func exists(_ name: String) -> Bool {
+        if_nametoindex(name) != 0
     }
 
     /// `.none` → nil (outbounds ride the system path); `.named` → the pinned name;

@@ -1,5 +1,7 @@
 import Foundation
+import Synchronization
 import Testing
+import XrayCore
 @testable import ElsewhereKit
 
 /// End-to-end doctor: a temp config, a fake INCY on a real loopback listener, and the
@@ -26,7 +28,13 @@ struct DoctorTests {
             "incy": .proxy(URL(string: "http://127.0.0.1:\(incyPort)")!),
         ]))
 
-        let checks = await Doctor.run(store: store, environment: [:], localProxyPort: closedPort)
+        let exclusions = Mutex<[UInt16]>([])
+        let checks = await Doctor.run(
+            store: store, environment: [:], localProxyPort: closedPort,
+            portCandidates: { count, excluding in
+                exclusions.withLock { $0 = excluding }
+                return try await XrayCore.shared.freePorts(count, excluding: Set(excluding))
+            })
         #expect(checks.count == 9)
         #expect(!checks.contains(where: { $0.verdict == .failure }))
 
@@ -42,6 +50,11 @@ struct DoctorTests {
         #expect(checks["xray config"]?.verdict == .ok)
         #expect(checks["local proxy"]?.detail.contains("nothing") == true)
 
+        // A loopback proxy exit's own port must be out of the candidate pool —
+        // an inbound re-issued on it would collide at run time.
+        #expect(exclusions.withLock { $0 }.contains(incyPort))
+        #expect(exclusions.withLock { $0 }.contains(closedPort))
+
         let rendered = Doctor.lines(checks).joined(separator: "\n")
         for secret in Synthetic.secrets + [Synthetic.link] {
             #expect(!rendered.contains(secret), "leaked \(secret)")
@@ -52,7 +65,31 @@ struct DoctorTests {
         let checks = await Doctor.run(store: store(), environment: [:], localProxyPort: 9)
         #expect(checks["config"]?.verdict == .failure)
         #expect(checks["engine"]?.verdict == .ok)
+        // The battery is fixed: the row reports the skip rather than vanishing.
+        #expect(checks["xray config"]?.verdict == .info)
+        #expect(checks["xray config"]?.detail == "skipped — no resolvable exits")
         #expect(!Doctor.lines(checks).isEmpty)
+    }
+
+    @Test func anOutboundWithoutAProtocolIsAFailure() async throws {
+        let store = store()
+        try store.save(ElsewhereConfig(exits: [
+            "shapeless": .xray(.object(["settings": .object([:])]))
+        ]))
+        let checks = await Doctor.run(store: store, environment: [:], localProxyPort: 9)
+        #expect(checks["exit shapeless"]?.verdict == .failure)
+        #expect(checks["exit shapeless"]?.detail == "invalid outbound (no protocol)")
+    }
+
+    @Test func aMissingNamedInterfaceIsAWarning() async throws {
+        let store = store()
+        var config = ElsewhereConfig(exits: ["moldova": .link(Synthetic.link)])
+        config.bindInterface = .named("nonexistent0")
+        try store.save(config)
+        let checks = await Doctor.run(store: store, environment: [:], localProxyPort: 9)
+        #expect(checks["interface"]?.verdict == .warning)
+        #expect(
+            checks["interface"]?.detail == "interface 'nonexistent0' not found on this Mac")
     }
 
     @Test func aListenerOnTheLocalProxyPortIsNamedIncy() async throws {

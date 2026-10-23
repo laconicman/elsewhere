@@ -40,6 +40,16 @@ struct LoopbackProbeTests {
         #expect(await LoopbackProbe.isListening(host: "::1", port: port))
     }
 
+    @Test(arguments: ["127.0.0.1", "127.0.0.2", "127.255.255.254", "LOCALHOST.", "localhost", "::1", "[::1]"])
+    func loopbackHosts(_ host: String) {
+        #expect(LoopbackProbe.isLoopbackHost(host))
+    }
+
+    @Test(arguments: ["10.0.0.1", "example.com", "127.0.0.256", "127.0.0", "::2"])
+    func nonLoopbackHosts(_ host: String) {
+        #expect(!LoopbackProbe.isLoopbackHost(host))
+    }
+
     /// A port nothing listens on: bind to 0, read the assigned port, close.
     private func closedPort() -> UInt16 {
         let fd = socket(AF_INET, SOCK_STREAM, 0)

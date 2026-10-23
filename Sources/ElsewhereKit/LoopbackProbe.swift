@@ -57,4 +57,18 @@ public enum LoopbackProbe {
             connection.cancel()
         }
     }
+
+    /// The hosts a `proxy` exit gets probed on: `localhost` (any case, one optional
+    /// trailing dot), `::1`/`[::1]`, and every IPv4 literal in 127.0.0.0/8 — `127.0.0.2`
+    /// is loopback too, not just `.1`. Everything else reads as external.
+    public static func isLoopbackHost(_ host: String) -> Bool {
+        var name = host.lowercased()
+        if name.hasSuffix(".") { name.removeLast() }
+        if name == "localhost" || name == "::1" || name == "[::1]" { return true }
+        // Four decimal octets, no regex: any UInt8-parseable quad headed by 127.
+        let octets = name.split(separator: ".", omittingEmptySubsequences: false)
+        guard octets.count == 4 else { return false }
+        let bytes = octets.compactMap { UInt8($0) }
+        return bytes.count == 4 && bytes[0] == 127
+    }
 }

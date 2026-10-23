@@ -4,7 +4,9 @@ import XrayCore // internal — the engine stays behind this module's own types 
 /// `elsewhere doctor`: a fixed battery of checks over the engine, the config, each exit
 /// and the generated Xray config — the §5.7 line "config present+0600, each link
 /// converts, config passes testXray, interface chosen, ports free, Xray version, INCY
-/// detected on 10808, redacted", in that order.
+/// detected on 10808, redacted". Every row reports every run — a check that cannot run
+/// (`xray config` with no resolvable exits or port candidates) says so as `[info]`
+/// rather than vanishing.
 ///
 /// Nothing thrown escapes: a broken thing is a check, not an exit status. And no detail
 /// ever carries a secret — every engine message is scrubbed with the secrets collected
@@ -27,13 +29,16 @@ public enum Doctor {
     }
 
     /// The checks, in display order. `localProxyPort` is where a system proxy would
-    /// listen (INCY uses 10808); it is also excluded from the candidate inbound ports.
-    /// `interfaceResolver` is injectable so tests can drive the `.auto` failure path.
+    /// listen (INCY uses 10808); it — and every loopback `proxy` exit's port — is
+    /// excluded from the candidate inbound ports. `interfaceResolver` and
+    /// `portCandidates` are injectable so tests can drive the `.auto` failure path
+    /// and see the exclusions.
     public static func run(
         store: ConfigStore,
         environment: [String: String],
         localProxyPort: UInt16 = 10808,
-        interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve
+        interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve,
+        portCandidates: (@Sendable (Int, [UInt16]) async throws -> [UInt16])? = nil
     ) async -> [Check] {
         var checks: [Check] = []
 
@@ -97,8 +102,14 @@ public enum Doctor {
                     if let outbound = try await ExitResolver.outbound(for: exit, named: name) {
                         resolved.append((name, outbound))
                         let outboundSecrets = Redactor.secrets(in: outbound)
+                        // `.ok` only when the resolved outbound has a protocol string —
+                        // a shapeless object would otherwise read "invalid outbound"
+                        // under a green tag.
+                        let valid = if case .object(let object) = outbound.singleOutbound,
+                            case .string = object["protocol"]
+                        { true } else { false }
                         checks.append(Check(
-                            name: "exit \(name)", verdict: .ok,
+                            name: "exit \(name)", verdict: valid ? .ok : .failure,
                             detail: scrubbed(describe(outbound), extraSecrets: outboundSecrets)))
                     }
                 } catch {
@@ -109,7 +120,7 @@ public enum Doctor {
             case .proxy(let url):
                 let summary = Redactor.summary(of: exit)
                 let host = url.host(percentEncoded: false)
-                if let host, isLoopback(host) {
+                if let host, LoopbackProbe.isLoopbackHost(host) {
                     if let port = url.port, let port16 = UInt16(exactly: port), port16 > 0 {
                         if await LoopbackProbe.isListening(host: host, port: port16) {
                             checks.append(Check(
@@ -162,7 +173,15 @@ public enum Doctor {
                 checks.append(Check(
                     name: "interface", verdict: .info, detail: "outbounds unbound (via system)"))
             case .named(let name):
-                checks.append(Check(name: "interface", verdict: .ok, detail: name))
+                // A pinned name is verified against the kernel — a typo'd
+                // `bindInterface` warns here instead of failing at tunnel start.
+                if InterfaceResolver.exists(name) {
+                    checks.append(Check(name: "interface", verdict: .ok, detail: name))
+                } else {
+                    checks.append(Check(
+                        name: "interface", verdict: .warning,
+                        detail: "interface '\(name)' not found on this Mac"))
+                }
             case .auto:
                 if let interface {
                     checks.append(Check(name: "interface", verdict: .ok, detail: interface))
@@ -177,11 +196,24 @@ public enum Doctor {
             }
         }
 
-        // 6. Candidate ports — one per resolved exit + one for `direct`, never INCY's.
+        // 6. Candidate ports — one per resolved exit + one for `direct`, never INCY's
+        // and never a loopback `proxy` exit's own: a re-issued port collides at run
+        // time, not here (`test` binds nothing).
+        let proxyPorts: [UInt16] = (config?.exits ?? [:]).values.compactMap { exit in
+            guard case .proxy(let url) = exit,
+                let host = url.host(percentEncoded: false),
+                LoopbackProbe.isLoopbackHost(host),
+                let port = url.port
+            else { return nil }
+            return UInt16(exactly: port)
+        }
         var ports: [UInt16] = []
         do {
-            ports = try await XrayCore.shared.freePorts(
-                resolved.count + 1, excluding: [localProxyPort])
+            // `portCandidates` is the test seam; nil is the engine's freePorts — kept
+            // out of the default argument because XrayCore is internal to this module.
+            ports = try await (portCandidates ?? {
+                try await XrayCore.shared.freePorts($0, excluding: Set($1))
+            })(resolved.count + 1, [localProxyPort] + proxyPorts)
             checks.append(Check(
                 name: "ports", verdict: .ok,
                 detail: "\(ports.count) candidates for \(resolved.count) exits + direct"))
@@ -192,8 +224,17 @@ public enum Doctor {
         }
 
         // 7. The assembled config passes the engine's own validation — the live proof
-        // that a converted outbound splices (C5 §3: `test` binds no sockets).
-        if !resolved.isEmpty, ports.count == resolved.count + 1 {
+        // that a converted outbound splices (C5 §3: `test` binds no sockets). The row
+        // is never absent: a skip is reported, keeping the battery fixed.
+        if resolved.isEmpty {
+            checks.append(Check(
+                name: "xray config", verdict: .info,
+                detail: "skipped — no resolvable exits"))
+        } else if ports.count != resolved.count + 1 {
+            checks.append(Check(
+                name: "xray config", verdict: .info,
+                detail: "skipped — no port candidates"))
+        } else {
             var portsByName: [String: UInt16] = [:]
             for (index, lane) in resolved.enumerated() {
                 portsByName[lane.name] = ports[index]
@@ -279,11 +320,5 @@ public enum Doctor {
             }
         }
         return route
-    }
-
-    /// The hosts a `proxy` exit gets probed on: literals only — `localhost` resolves, so
-    /// a probe is meaningful there too.
-    static func isLoopback(_ host: String) -> Bool {
-        ["127.0.0.1", "localhost", "::1", "[::1]"].contains(host)
     }
 }
