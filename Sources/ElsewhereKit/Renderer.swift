@@ -202,27 +202,69 @@ extension Renderer {
     ) -> [String] {
         let indent = String(repeating: "  ", count: depth)
         var lines: [String] = []
-        var number = 1
+        // ol[start] seeds the counter; numbering continues from the emitted value.
+        var number = ordered
+            ? ((try? list.attr("start"))
+                .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 1)
+            : 1
         for child in list.children() where child.tagName() == "li" {
+            if ordered,
+                let value = (try? child.attr("value"))
+                    .flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) })
+            { number = value } // li[value] overrides; the next item counts on
             let bullet = ordered ? "\(number). " : "- "
             number += 1
-            var ownText: [String] = []
-            var nested: [String] = []
+
+            // Children in document order: an `li` is text runs interleaved with
+            // nested lists. The first text run is the item's own line; a text run
+            // after a list is a continuation line at the item's text column.
+            enum Segment { case text(String); case list([String]) }
+            var segments: [Segment] = []
+            var buffer = ""
             for node in child.getChildNodes() {
                 if let element = node as? Element,
                     ["ul", "ol"].contains(element.tagName().lowercased())
                 {
-                    nested += listItems(element, ordered: element.tagName() == "ol",
-                                        depth: depth + 1, markdown: markdown)
+                    if !buffer.isEmpty {
+                        segments.append(.text(buffer))
+                        buffer = ""
+                    }
+                    segments.append(.list(listItems(
+                        element, ordered: element.tagName() == "ol",
+                        depth: depth + 1, markdown: markdown)))
                 } else if let text = node as? TextNode {
-                    ownText.append(collapse(text.text()))
+                    buffer += collapse(text.text())
                 } else if let element = node as? Element {
-                    ownText.append(inline(element, markdown: markdown))
+                    buffer += inline(element, markdown: markdown)
                 }
             }
-            let text = trimBlock(ownText.joined())
-            lines.append(indent + bullet + text)
-            lines += nested
+            if !buffer.isEmpty { segments.append(.text(buffer)) }
+
+            var bulletUsed = false
+            for segment in segments {
+                switch segment {
+                case .text(let raw):
+                    let text = trimBlock(raw)
+                    if text.isEmpty { continue }
+                    if bulletUsed {
+                        let column = indent
+                            + String(repeating: " ", count: bullet.count)
+                        lines.append(column + text)
+                    } else {
+                        lines.append(indent + bullet + text)
+                        bulletUsed = true
+                    }
+                case .list(let nested):
+                    if !bulletUsed {
+                        lines.append(indent + bullet)
+                        bulletUsed = true
+                    }
+                    lines += nested
+                }
+            }
+            if !bulletUsed {
+                lines.append(indent + bullet) // an empty li is a bare bullet
+            }
         }
         return lines.isEmpty ? [] : [lines.joined(separator: "\n")]
     }

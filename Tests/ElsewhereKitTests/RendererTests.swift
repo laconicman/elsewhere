@@ -184,6 +184,28 @@ struct RendererTests {
         #expect(rendered.contains("1. one\n2. two"))
     }
 
+    /// `ol[start]` seeds the counter; `li[value]` overrides it and numbering
+    /// continues from the emitted value.
+    @Test func orderedListsHonourStartAndValue() {
+        let rendered = Renderer.render(
+            "<body><ol start=\"5\"><li>a</li><li>b</li></ol>"
+                + "<ol><li value=\"9\">x</li><li>y</li></ol></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("5. a\n6. b"))
+        #expect(rendered.contains("9. x\n10. y"))
+    }
+
+    /// Text around a nested list keeps document order: before → item line,
+    /// nested items, after → a continuation line at the item's text column.
+    @Test func itemTextAroundANestedListKeepsDocumentOrder() {
+        let rendered = Renderer.render(
+            "<body><ul><li>before<ul><li>nested</li></ul>after</li></ul></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("- before\n  - nested\n  after"))
+    }
+
     @Test func tableEscapesPipesAndFlattensCells() {
         let rendered = Renderer.render(
             "<body><table><tr><th>A</th><th>B</th></tr>"
