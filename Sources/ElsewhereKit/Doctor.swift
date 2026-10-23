@@ -28,10 +28,12 @@ public enum Doctor {
 
     /// The checks, in display order. `localProxyPort` is where a system proxy would
     /// listen (INCY uses 10808); it is also excluded from the candidate inbound ports.
+    /// `interfaceResolver` is injectable so tests can drive the `.auto` failure path.
     public static func run(
         store: ConfigStore,
         environment: [String: String],
-        localProxyPort: UInt16 = 10808
+        localProxyPort: UInt16 = 10808,
+        interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve
     ) async -> [Check] {
         var checks: [Check] = []
 
@@ -147,24 +149,30 @@ public enum Doctor {
             }
         }
 
-        // 5. Interface binding (§3.3): resolved name, pinned name, or unbound by choice.
+        // 5. Interface binding (§3.3): resolved name, pinned name, or unbound by
+        // choice. `auto` that finds nothing is a FAILURE, not a quiet unbind — the
+        // tunnel would otherwise follow the system route (rule 5: no silent fallback;
+        // PR #2's TunnelSupervisor throws `.tunnel` in the same case).
         var interface: String?
+        var autoUnresolved = false
         if let config {
+            interface = await interfaceResolver(config.bindInterface)
             switch config.bindInterface {
             case .none:
                 checks.append(Check(
                     name: "interface", verdict: .info, detail: "outbounds unbound (via system)"))
             case .named(let name):
-                interface = name
                 checks.append(Check(name: "interface", verdict: .ok, detail: name))
             case .auto:
-                if let found = await InterfaceResolver.physicalInterfaceName() {
-                    interface = found
-                    checks.append(Check(name: "interface", verdict: .ok, detail: found))
+                if let interface {
+                    checks.append(Check(name: "interface", verdict: .ok, detail: interface))
                 } else {
+                    autoUnresolved = true
                     checks.append(Check(
-                        name: "interface", verdict: .warning,
-                        detail: "no physical interface found; outbounds would run unbound"))
+                        name: "interface", verdict: .failure,
+                        detail: "no physical interface found; the tunnel refuses to "
+                            + "start unbound — set bindInterface to a name or `none` "
+                            + "to run via the system path"))
                 }
             }
         }
@@ -197,7 +205,9 @@ public enum Doctor {
                 try await XrayCore.shared.test(configJSON: built.configJSON)
                 checks.append(Check(
                     name: "xray config", verdict: .ok,
-                    detail: "assembles and validates (\(resolved.count + 1) inbounds)"))
+                    detail: "assembles and validates (\(resolved.count + 1) inbounds)"
+                        + (autoUnresolved
+                            ? " (validated unbound — interface unresolved)" : "")))
             } catch {
                 let outboundSecrets = resolved.flatMap { Redactor.secrets(in: $0.outbound) }
                 checks.append(Check(

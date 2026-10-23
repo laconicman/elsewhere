@@ -44,7 +44,8 @@ the inbound keeps both ears anyway.
 `streamSettings.sockopt` — including `out:direct`. This is what makes `--direct` direct:
 while a system tunnel (INCY's utun) owns the default route, sockets bound to `en0` leave
 through it (S3 proved it on the live tunnel — bound egress differed). `auto` resolves the
-current path's first physical interface at tunnel start via `NWPathMonitor`.
+current path's first physical interface at tunnel start via `NWPathMonitor`; if none is
+found that is a `doctor` failure and a tunnel-time error, never a quiet unbind (rule 5).
 **The caveat (C5 §6):** the *connection* is bound; the *hostname lookup* is not — Xray's
 freedom outbound resolves through the system resolver. Direct connection, system-path
 lookup; accepted for 0.1.0 (TD-4). **Rejected:** per-exit binding (unneeded flexibility)

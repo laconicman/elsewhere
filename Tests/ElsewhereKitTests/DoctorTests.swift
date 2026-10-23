@@ -73,6 +73,21 @@ struct DoctorTests {
         #expect(checks["default"]?.verdict == .ok)
     }
 
+    @Test func anUnresolvedAutoInterfaceIsAFailure() async throws {
+        let store = store()
+        try store.save(ElsewhereConfig(exits: ["moldova": .link(Synthetic.link)]))
+        let checks = await Doctor.run(
+            store: store, environment: [:], localProxyPort: 9,
+            interfaceResolver: { _ in nil })
+        #expect(checks["interface"]?.verdict == .failure)
+        #expect(checks["interface"]?.detail.contains("refuses to start unbound") == true)
+        // The config test still runs — unbound, and it says so.
+        #expect(checks["xray config"]?.verdict == .ok)
+        #expect(
+            checks["xray config"]?.detail.contains("validated unbound — interface unresolved")
+                == true)
+    }
+
     @Test func linesPadTheColumns() {
         let line = Doctor.lines([.init(name: "engine", verdict: .ok, detail: "X")])
         #expect(line == ["[ok]   engine  X"])
