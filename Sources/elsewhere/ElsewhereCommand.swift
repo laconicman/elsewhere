@@ -14,13 +14,17 @@ struct ElsewhereCommand: AsyncParsableCommand {
         ~/Library/Application Support/elsewhere/config.json.
         ELSEWHERE_LINK alone synthesizes one in-memory exit named `env` for ad-hoc use.
 
-        Planned commands, not in this build: fetch, whoami, run; `serve` (MCP) in M2.
+        Signals: SIGINT/SIGTERM cancel the in-flight work and exit 128 + the signal
+        number — the shell convention. `serve` (MCP) arrives with M2.
 
         Exit status (stable; scripts may rely on it):
         \(ExitStatus.help)
         """,
         version: Elsewhere.version,
-        subcommands: [ExitsCommand.self, DoctorCommand.self]
+        subcommands: [
+            FetchCommand.self, WhoAmICommand.self, RunCommand.self,
+            ExitsCommand.self, DoctorCommand.self,
+        ]
     )
 
     /// `parseAsRoot` + run, hand-rolled for one reason: ArgumentParser's own parse
