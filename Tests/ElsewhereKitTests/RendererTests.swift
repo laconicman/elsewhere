@@ -489,6 +489,20 @@ struct RendererTests {
         #expect(rendered.contains("- \\# not a heading"))
     }
 
+    /// A hostile `colspan` fans into at most `maxTableColumns` cells — HTML
+    /// clamps the span at 1000, the grid caps the width at 256.
+    @Test func hugeTableSpansAreBounded() {
+        let rendered = Renderer.render(
+            "<body><table><tr><td colspan=\"1000000000\">x</td></tr>"
+                + "<tr><td>a</td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        let separator = rendered.components(separatedBy: "\n")
+            .first { $0.contains("---") }
+        #expect(separator?.components(separatedBy: "---").count ?? 0
+            <= Renderer.maxTableColumns + 1)
+    }
+
     /// An all-empty `<tr>` pads to whitespace-only cells; text mode drops it
     /// like the Markdown branch does — two real rows yield two lines.
     @Test func textModeTablesSkipEmptyRows() {

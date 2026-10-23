@@ -42,6 +42,10 @@ public enum Renderer {
     /// subtree renders as its collapsed text — iterative, no recursion.
     static let maxDepth = 64
 
+    /// Columns a rendered table may carry — a hostile `colspan` fans into
+    /// empty cells, so the grid caps its width and its padding here.
+    static let maxTableColumns = 256
+
     /// - Parameters:
     ///   - text: the decoded body (`TextDecoder` decides text vs binary earlier).
     ///   - contentType: the response's Content-Type, if any.
@@ -532,13 +536,16 @@ extension Renderer {
                 let text = trimBlock(
                     inline(cell, markdown: markdown, depth: depth + 2))
                     .replacingOccurrences(of: "\n", with: " ")
-                let span = (try? cell.attr("colspan"))
+                // HTML clamps a `colspan` above 1000 to 1000 — the same bound
+                // before the fan, so a billion can't allocate a billion cells.
+                let raw = (try? cell.attr("colspan"))
                     .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 1
+                let span = min(max(raw, 1), 1000)
                 return [text] + Array(repeating: "", count: max(0, span - 1))
             }
         }
-        var grid = rows.map(cells)
-        let width = grid.map(\.count).max() ?? 0
+        var grid = rows.map { Array(cells($0).prefix(maxTableColumns)) }
+        let width = min(grid.map(\.count).max() ?? 0, maxTableColumns)
         guard width > 0 else { return [] }
         for index in grid.indices where grid[index].count < width {
             grid[index] += Array(repeating: "", count: width - grid[index].count)
