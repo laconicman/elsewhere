@@ -409,6 +409,58 @@ struct RendererTests {
         #expect(rendered.contains("```\n\ncode\n\n```"))
     }
 
+    /// An article's own `header` is content — only chrome *outside* the content
+    /// root is removed.
+    @Test func aHeaderInsideTheContentRootSurvives() {
+        let rendered = Renderer.render(
+            "<body><article><header><h1>Title</h1></header><p>body</p></article>"
+                + "<nav>menu</nav></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("# Title"))
+        #expect(!rendered.contains("menu"))
+    }
+
+    /// An empty first `main` falls through to the body — a decorative `main`
+    /// must not blank the page.
+    @Test func anEmptyMainFallsThroughToBody() {
+        let rendered = Renderer.render(
+            "<body><main></main><div>all the content</div></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("all the content"))
+    }
+
+    /// Inline `display:none` hides the same content `hidden` does.
+    @Test func aDisplayNoneSpanIsDropped() {
+        let rendered = Renderer.render(
+            "<body><p>seen<span style=\"display:none\">hidden</span></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("seen"))
+        #expect(!rendered.contains("hidden"))
+    }
+
+    /// On a JavaScript shell `noscript` IS the content — it renders as blocks
+    /// before the note. On a content page it drops.
+    @Test func noscriptRendersOnAShellAndDropsOtherwise() {
+        let shell = Renderer.render(
+            "<html><head><script src=\"/app.js\"></script></head><body>"
+                + "<noscript><p>needs JS</p></noscript><div id=\"app\"></div>"
+                + "</body></html>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(shell.contains("needs JS"))
+        #expect(shell.contains(Renderer.jsShellNote))
+        let page = Renderer.render(
+            "<body><main><p>real content here</p></main>"
+                + "<noscript><p>needs JS</p></noscript></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(page.contains("real content here"))
+        #expect(!page.contains("needs JS"))
+    }
+
     // MARK: - The shell note and whitespace
 
     @Test func jsShellNoteOnOffAroundTheThreshold() {

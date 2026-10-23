@@ -65,21 +65,65 @@ public enum Renderer {
         // The shell check counts before the elements go.
         let hadExternalScripts = ((try? document.select("script[src]"))?.count ?? 0) > 0
 
-        if let chrome = try? document.select(
-            "script, style, noscript, svg, nav, footer, header, aside, form, "
-                + "iframe, template, [hidden], [aria-hidden=true]")
-        { _ = try? chrome.remove() }
+        // `noscript` is not chrome — on a JavaScript shell it carries the page's
+        // only useful content. It comes out before anything else and is
+        // re-rendered as blocks when the shell note fires; otherwise it drops.
+        let noscripts = (try? document.select("noscript")) ?? Elements()
+        _ = try? noscripts.remove()
 
-        let root = (try? document.select("main"))?.first()
-            ?? (try? document.select("article"))?.first()
-            ?? (try? document.select("[role=main]"))?.first()
-            ?? document.body() ?? document
+        // Always-hidden or machine-only nodes die wherever they live — inline
+        // `display:none` hides the same content `hidden`/`aria-hidden` does.
+        // `*=` already matches case-insensitively (SwiftSoup lowercases both
+        // sides); no CSS4 `i` flag exists in its parser.
+        if let junk = try? document.select(
+            "script, style, svg, iframe, template, [hidden], [aria-hidden=true], "
+                + "[style*=display:none], [style*=display: none]")
+        { _ = try? junk.remove() }
 
         let markdown = format == .markdown
-        let blocks = blocks(of: root, markdown: markdown, depth: 0)
-        var body = blocks.joined(separator: "\n\n")
+
+        // The root is the first semantic candidate that yields blocks — an empty
+        // or decorative `main` falls through rather than blanking the page.
+        var content: [String] = []
+        var semanticRoot: Element?
+        for selector in ["main", "article", "[role=main]"] where semanticRoot == nil {
+            for candidate in (try? document.select(selector)) ?? Elements() {
+                let rendered = blocks(of: candidate, markdown: markdown, depth: 0)
+                if !rendered.isEmpty {
+                    semanticRoot = candidate
+                    content = rendered
+                    break
+                }
+            }
+        }
+
+        if let root = semanticRoot {
+            // Page chrome dies only outside the content root — an article's own
+            // `header`/`aside` is content, not chrome.
+            if let chrome = try? document.select("nav, footer, header, aside, form") {
+                for element in chrome where !isInside(element, root) {
+                    _ = try? element.remove()
+                }
+            }
+        } else {
+            // No semantic region — page chrome goes everywhere, then the body
+            // renders.
+            if let chrome = try? document.select("nav, footer, header, aside, form") {
+                _ = try? chrome.remove()
+            }
+            content = blocks(
+                of: document.body() ?? document, markdown: markdown, depth: 0)
+        }
+
+        var body = content.joined(separator: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if hadExternalScripts, body.count < jsShellThreshold {
+            let fallback = noscripts
+                .flatMap { blocks(of: $0, markdown: markdown, depth: 0) }
+                .joined(separator: "\n\n")
+            if !fallback.isEmpty {
+                body = body.isEmpty ? fallback : body + "\n\n" + fallback
+            }
             let note = markdown ? jsShellNote : jsShellNotePlain
             body = body.isEmpty ? note : body + "\n\n" + note
         }
@@ -92,6 +136,17 @@ public enum Renderer {
         // Same rule as --json: a credentialled URL's userinfo never reaches stdout.
         out.append("Source: \(Redactor.redact(url: finalURL))")
         return out.joined(separator: "\n\n") + "\n"
+    }
+
+    /// Is `element` a strict descendant of `root`? Chrome scoping needs ancestry,
+    /// not containment — the root itself doesn't count.
+    private static func isInside(_ element: Element, _ root: Element) -> Bool {
+        var node = element.parent()
+        while let parent = node {
+            if parent === root { return true }
+            node = parent.parent()
+        }
+        return false
     }
 
     /// HTML when the type says so, or when the body opens like a document and the

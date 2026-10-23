@@ -1,13 +1,11 @@
 # ifconfig - Wikipedia
 
-Network administration utility in Unix-like operating systems
-
 Not to be confused with [ipconfig](https://en.wikipedia.org/wiki/Ipconfig).
 
 | ifconfig |
 |---|
 | [![](https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Ifconfig_example_screenshot.png/250px-Ifconfig_example_screenshot.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail)](https://en.wikipedia.org/wiki/File:Ifconfig_example_screenshot.png) Screenshot of ifconfig output in Linux |
-| Release | August 1983; 43 years ago (1983-08) |
+| Release | August 1983; 43 years ago |
 | [Operating system](https://en.wikipedia.org/wiki/Operating_system) | [Unix](https://en.wikipedia.org/wiki/Unix) and [Unix-like](https://en.wikipedia.org/wiki/Unix-like) |
 | [Type](https://en.wikipedia.org/wiki/Software_categories#Categorization_approaches) | [Command](https://en.wikipedia.org/wiki/Command_(computing)) |
 
