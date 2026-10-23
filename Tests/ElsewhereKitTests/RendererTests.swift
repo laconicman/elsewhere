@@ -154,6 +154,26 @@ struct RendererTests {
         #expect(rendered.contains("go jump\n")) // text stays, syntax and empty link go
     }
 
+    /// A container whose children are text and inline elements without a wrapping
+    /// `<p>` is ONE paragraph — the link survives and the words stay together
+    /// (the layout-lines defect: they used to split into separate blocks).
+    @Test func anInlineRunInAContainerIsOneParagraph() {
+        let rendered = Renderer.render(
+            #"<body><div>See <a href="/x">here</a> now</div></body>"#,
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("See [here](https://example.com/x) now"))
+    }
+
+    /// Inline runs and block children alternate correctly inside one container.
+    @Test func inlineRunsAlternateWithBlockChildren() {
+        let rendered = Renderer.render(
+            "<body><div>text<p>para</p>tail <em>e</em></div></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("text\n\npara\n\ntail *e*"))
+    }
+
     @Test func nestedListsIndentTwoSpacesPerLevel() {
         let rendered = Renderer.render(
             "<body><ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>"

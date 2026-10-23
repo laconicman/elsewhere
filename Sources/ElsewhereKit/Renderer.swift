@@ -90,17 +90,54 @@ public enum Renderer {
 }
 
 extension Renderer {
-    /// The block children of `element`, each a string that is one block.
-    private static func blocks(of element: Element, markdown: Bool) -> [String] {
-        element.getChildNodes().flatMap { node -> [String] in
-            if let text = node as? TextNode {
-                let rendered = trimBlock(collapse(text.text()))
-                return rendered.isEmpty
-                    ? [] : [escapeBlockStart(rendered, markdown: markdown)]
-            }
-            guard let element = node as? Element else { return [] }
-            return block(element, markdown: markdown)
+    /// Elements that can open a block — `block()` handles these. Everything else
+    /// (text nodes, `a`/`em`/`span`/…, `br`, `img`) is inline content and joins the
+    /// paragraph around it. `td`/`th`/`tr` are listed for completeness; `table()`
+    /// reaches them first.
+    private static let blockTags: Set<String> = [
+        "address", "article", "aside", "blockquote", "body", "caption", "dd",
+        "details", "dialog", "div", "dl", "dt", "fieldset", "figcaption", "figure",
+        "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "li",
+        "main", "menu", "nav", "ol", "p", "pre", "section", "summary", "table",
+        "tbody", "td", "tfoot", "th", "thead", "tr", "ul",
+    ]
+
+    /// True when `element` opens a block — its tag is listed, or it carries a
+    /// block-level descendant: an unlisted element *wrapping* block children is a
+    /// container, not inline text (GitHub's `<markdown-accessiblity-table>` wraps a
+    /// `table`; flattening it into a paragraph would lose the table).
+    private static func isBlock(_ element: Element) -> Bool {
+        if blockTags.contains(element.tagName().lowercased()) { return true }
+        return element.getChildNodes().contains { node in
+            guard let child = node as? Element else { return false }
+            return isBlock(child)
         }
+    }
+
+    /// The block children of `element`, each a string that is one block. A maximal
+    /// run of inline nodes renders as ONE paragraph — `<div>See <a>here</a> now</div>`
+    /// is "See [here](…) now", not three blocks. (Before this grouping an inline
+    /// element took `block()`'s default path and lost its link/emphasis entirely.)
+    private static func blocks(of element: Element, markdown: Bool) -> [String] {
+        var blocks: [String] = []
+        var run: [Node] = []
+        func flushRun() {
+            let text = escapeBlockStart(
+                trimBlock(run.map { inline($0, markdown: markdown) }.joined()),
+                markdown: markdown)
+            if !text.isEmpty { blocks.append(text) }
+            run = []
+        }
+        for node in element.getChildNodes() {
+            if let child = node as? Element, isBlock(child) {
+                flushRun()
+                blocks += block(child, markdown: markdown)
+            } else {
+                run.append(node)
+            }
+        }
+        flushRun()
+        return blocks
     }
 
     /// One element as blocks — the element-name switch is the whole contract.

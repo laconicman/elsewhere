@@ -2,11 +2,7 @@
 
 Network administration utility in Unix-like operating systems
 
-Not to be confused with
-
-ipconfig
-
-.
+Not to be confused with [ipconfig](https://en.wikipedia.org/wiki/Ipconfig).
 
 | ifconfig |
 |---|
@@ -23,11 +19,7 @@ Many Linux distributions have deprecated ifconfig in favor of the [iproute2](htt
 
 ## Usage
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=1)]
 
 Common uses for ifconfig include setting the [IP address](https://en.wikipedia.org/wiki/IP_address) and [subnet mask](https://en.wikipedia.org/wiki/Subnet_mask) of a network interface and disabling or enabling an interface.[1] At boot time, many Unix-like operating systems initialize their network interfaces with [shell scripts](https://en.wikipedia.org/wiki/Shell_script) that call ifconfig. As an interactive tool, system administrators routinely use the utility to display and analyze network interface parameters. The following two examples show the output of the tool when querying the state of a single active interface each on a [Linux](https://en.wikipedia.org/wiki/Linux)-based host (interface [eth](https://en.wikipedia.org/wiki/Ethernet)0) and the [ural0](https://en.wikipedia.org/wiki/Ralink) interface on an [OpenBSD](https://en.wikipedia.org/wiki/OpenBSD) installation.
 
@@ -57,11 +49,7 @@ Common uses for ifconfig include setting the [IP address](https://en.wikipedia.o
 
 ### Medium access control functions
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=2)]
 
 ifconfig is also commonly used to change the [medium access control](https://en.wikipedia.org/wiki/Medium_access_control) (MAC) address of an interface. In this process, the network interface is first disabled (set *down*) with the ifconfig command, followed by a MAC change command:
 
@@ -73,11 +61,7 @@ ifconfig wlan0 up
 
 ## Release status
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=3)]
 
 The [Berkeley Software Distribution](https://en.wikipedia.org/wiki/Berkeley_Software_Distribution) [UNIX](https://en.wikipedia.org/wiki/UNIX) operating systems (e.g., [NetBSD](https://en.wikipedia.org/wiki/NetBSD), [OpenBSD](https://en.wikipedia.org/wiki/OpenBSD), and [FreeBSD](https://en.wikipedia.org/wiki/FreeBSD)) continue active development of ifconfig and extension of its functionality to cover the configuration of [wireless networking](https://en.wikipedia.org/wiki/Wireless_network) interfaces, [VLAN](https://en.wikipedia.org/wiki/VLAN) trunking, controlling hardware features such as [TSO](https://en.wikipedia.org/wiki/TCP_segmentation_offloading) or hardware checksumming or setting up bridge and tunnel interfaces. [Solaris](https://en.wikipedia.org/wiki/Solaris_(operating_system)) has historically used ifconfig for all network interface configuration, but as of Solaris 10 introduced dladm to perform data-link (OSI model layer 2) configuration, reducing ifconfig's purview to IP configuration.
 
@@ -87,11 +71,7 @@ Many Linux distributions have deprecated the use of ifconfig and route in favor 
 
 ## Related tools
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=4)]
 
 Another higher-level Linux command line tool is **ifup** (including **ifdown** and **ifquery**). In addition to controlling the interfaces, it also provides control of other aspects of the network such as specifying the [DNS servers](https://en.wikipedia.org/wiki/DNS_server) to use. The command is configured using the file */etc/network/interfaces*, which contains "stanzas" for each interface.
 
@@ -109,11 +89,7 @@ The ip suite has a similar purpose and is meant to replace the [deprecated](http
 
 ## See also
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=5)]
 
 - [Consistent Network Device Naming](https://en.wikipedia.org/wiki/Consistent_Network_Device_Naming)
 - [Ipconfig](https://en.wikipedia.org/wiki/Ipconfig)
@@ -121,11 +97,7 @@ edit
 
 ## References
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=6)]
 
 1. ↑ "Interface Configuration for IP". [*Linux Network Administrators Guide*](https://www.oreilly.com/openbook/linag2/book/ch05.html). June 2000. Retrieved 12 March 2024.
 2. ↑ [net-tools](https://sourceforge.net/projects/net-tools/)on[SourceForge](https://en.wikipedia.org/wiki/SourceForge)
@@ -136,11 +108,7 @@ edit
 
 ## External links
 
-[
-
-edit
-
-]
+[[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=7)]
 
 - [ifconfig(8)](https://net-tools.sourceforge.net/man/ifconfig.8.html), official [manpage](https://en.wikipedia.org/wiki/Manpage) for Linux net-tools ifconfig
 - [ifconfig(8)](https://www.freebsd.org/cgi/man.cgi?query=ifconfig), manpage for the [FreeBSD](https://en.wikipedia.org/wiki/FreeBSD) ifconfig
@@ -159,10 +127,6 @@ edit
 | Miscellaneous | [bc](https://en.wikipedia.org/wiki/Bc_(programming_language)) [cal](https://en.wikipedia.org/wiki/Cal_(command)) [dc](https://en.wikipedia.org/wiki/Dc_(computer_program)) [expr](https://en.wikipedia.org/wiki/Expr) [lp](https://en.wikipedia.org/wiki/System_V_printing_system) [od](https://en.wikipedia.org/wiki/Od_(Unix)) [sleep](https://en.wikipedia.org/wiki/Sleep_(command)) [true and false](https://en.wikipedia.org/wiki/True_and_false_(commands)) [watch](https://en.wikipedia.org/wiki/Watch_(command)) |
 | ![](https://thumb.wikimedia.org/wikipedia/en/thumb/9/96/Symbol_category_class.svg/20px-Symbol_category_class.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail) **Categories** [Standard Unix programs](https://en.wikipedia.org/wiki/Category:Standard_Unix_programs) [Unix SUS2008 utilities](https://en.wikipedia.org/wiki/Category:Unix_SUS2008_utilities) ![](https://thumb.wikimedia.org/wikipedia/en/thumb/d/db/Symbol_list_class.svg/20px-Symbol_list_class.svg.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail) **[List](https://en.wikipedia.org/wiki/List_of_POSIX_commands)** |
 
-Retrieved from "
-
-https://en.wikipedia.org/w/index.php?title=Ifconfig&oldid=1357443123
-
-"
+Retrieved from "[https://en.wikipedia.org/w/index.php?title=Ifconfig&oldid=1357443123](https://en.wikipedia.org/w/index.php?title=Ifconfig&oldid=1357443123)"
 
 Source: https://en.wikipedia.org/wiki/Ifconfig
