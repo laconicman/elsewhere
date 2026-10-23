@@ -81,12 +81,22 @@ public enum Renderer {
 
         let markdown = format == .markdown
 
-        // The root is the first semantic candidate that yields blocks — an empty
+        // The root is the first semantic candidate with real content — an empty
         // or decorative `main` falls through rather than blanking the page.
+        // Chrome inside a candidate doesn't count toward the judgment (a
+        // nav-only `main` is navigation, not content), though once a root is
+        // chosen everything inside it still renders.
         var content: [String] = []
         var semanticRoot: Element?
         for selector in ["main", "article", "[role=main]"] where semanticRoot == nil {
             for candidate in (try? document.select(selector)) ?? Elements() {
+                let chromeText = ((try? candidate
+                    .select("nav, footer, header, aside, form")) ?? Elements())
+                    .reduce(0) { $0 + ((try? $1.text()) ?? "").count }
+                // Nested chrome may double-count — that only makes the test
+                // stricter, so no clamp needed on the subtraction side.
+                let realText = ((try? candidate.text()) ?? "").count - chromeText
+                guard realText > 0 else { continue }
                 let rendered = blocks(of: candidate, markdown: markdown, depth: 0)
                 if !rendered.isEmpty {
                     semanticRoot = candidate

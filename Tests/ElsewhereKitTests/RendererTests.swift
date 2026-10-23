@@ -146,6 +146,19 @@ struct RendererTests {
         #expect(rendered.contains("![a](https://example.com/dir/i.png)"))
     }
 
+    /// A `main` carrying only navigation is navigation, not content — the
+    /// candidate judgment ignores chrome, so the `article` wins and the scoped
+    /// removal drops the nav outside it.
+    @Test func aNavigationOnlyMainFallsThroughToTheArticle() {
+        let rendered = Renderer.render(
+            "<body><main><nav>Menu</nav></main>"
+                + "<article><p>Story</p></article></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("Story"))
+        #expect(!rendered.contains("Menu"))
+    }
+
     /// `..` climbs, `//host` borrows the scheme, and `<base href>` rebases every
     /// relative URL in the document.
     @Test func dotDotSchemeRelativeAndBaseHrefsResolve() {
