@@ -244,7 +244,21 @@ extension Renderer {
             }
         }
         let code = wholeText(pre).trimmingCharacters(in: CharacterSet(charactersIn: "\n"))
-        return markdown ? "```\(language)\n\(code)\n```" : code
+        // The fence must outlive the longest backtick run inside the code
+        // (CommonMark 4.5 — a triple inside a triple would end the block early).
+        let fence = String(repeating: "`", count: max(3, longestBacktickRun(code) + 1))
+        return markdown ? "\(fence)\(language)\n\(code)\n\(fence)" : code
+    }
+
+    /// The longest run of `` ` `` in `text` — a delimiter must be one longer.
+    private static func longestBacktickRun(_ text: String) -> Int {
+        var longest = 0
+        var run = 0
+        for character in text {
+            if character == "`" { run += 1; longest = max(longest, run) }
+            else { run = 0 }
+        }
+        return longest
     }
 
     /// Every descendant text node verbatim — `pre` content keeps its whitespace.
@@ -306,8 +320,12 @@ extension Renderer {
             let content = inlineChildren(element, markdown: markdown)
             if content.isEmpty { return "" }
             guard markdown else { return content }
-            let fence = content.contains("`") ? "``" : "`"
-            return fence + content + fence
+            // The delimiter must outlive the longest backtick run inside;
+            // content that begins or ends with a backtick gets a space of
+            // padding (CommonMark 6.1 — ` ``x`` ` needs the spaces to parse).
+            let fence = String(repeating: "`", count: longestBacktickRun(content) + 1)
+            let padded = content.hasPrefix("`") || content.hasSuffix("`")
+            return fence + (padded ? " " : "") + content + (padded ? " " : "") + fence
         case "a":
             let content = inlineChildren(element, markdown: markdown)
             guard markdown else { return content }

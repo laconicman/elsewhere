@@ -225,6 +225,27 @@ struct RendererTests {
         #expect(rendered.contains("``a`b``"))
     }
 
+    /// A fence must be longer than the longest backtick run inside the code —
+    /// a triple inside a triple fence would end the block early.
+    @Test func aCodeFenceOutlivesBacktickRuns() {
+        let rendered = Renderer.render(
+            "<body><pre><code>let a = ```bad```</code></pre></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("````\nlet a = ```bad```\n````"))
+    }
+
+    /// The same rule inline, plus CommonMark's space padding when the content
+    /// begins or ends with a backtick.
+    @Test func anInlineCodeSpanOutlivesBacktickRuns() {
+        let rendered = Renderer.render(
+            "<body><p><code>x``y</code> and <code>`tick`</code></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("```x``y```"))
+        #expect(rendered.contains("`` `tick` ``"))
+    }
+
     // MARK: - The shell note and whitespace
 
     @Test func jsShellNoteOnOffAroundTheThreshold() {
