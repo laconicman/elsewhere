@@ -138,6 +138,37 @@ foreground group, so the child gets its own copy and the parent must outlive it 
 stop the tunnel. **Rejected:** per-app routing machinery (pf, a transparent proxy) —
 heavier than the contract needs.
 
+## `Renderer` walks SwiftSoup's DOM; escaping stays minimal
+
+`fetch --format markdown` renders HTML to Markdown for the agent's eyes. The field
+of Swift HTML→Markdown libraries is tiny — the plan's survey (§3.7) found every
+candidate at ≤ 18★ and unmaintained — so the renderer is ~300 lines over
+**SwiftSoup**, the long-lived jsoup port already trusted for parsing, and the
+block/inline rules are ours to tune (TD-6). The reader is a language model, which
+shapes two decisions. **Escaping is minimal:** only a text node that would open a
+block (`#`, `- `, `> `, `1. ` at line start) and `|` in table cells get a
+backslash — over-escaping hurts an agent's readability more than the rare literal
+marker it prevents. **The JavaScript-shell note is honest:** when a page carried
+`script[src]`s but renders under 200 characters, `fetch` appends
+`_Note: this page appears to be rendered by JavaScript; the HTML shell carried
+little content._` — a shell pretending to be content is worse than a named limit.
+Rendering applies only to what `TextDecoder` calls text: a trace body or a JSON
+document passes through byte-exact for every format, and `raw` always is. Fixtures
+are captured pages, one per shape — a GitHub README, a Wikipedia article, an Apple
+Documentation SPA shell — plus a hand-written `constructs.html` carrying every
+construct; provenance and licences live in
+`Tests/ElsewhereKitTests/Fixtures/html/SOURCES.md`, and goldens are the renderer's
+own output, frozen after a read (`ELSEWHERE_WRITE_GOLDENS=1` regenerates).
+
+## `Pager` pages in characters, with a continue marker
+
+`--max-length`/`--start-index` mirror the reference MCP fetch tool's
+`max_length`/`start_index`: a cut is in `Character`s — an emoji or a combining
+sequence is never split — and a page that leaves a remainder ends with
+`<elsewhere:truncated next_start_index=N total=T>`. `startIndex` past the end
+returns the marker alone (nothing more to read is information, not an error), and
+the CLI default of 0 means unlimited while M2's tool gets the agent-friendly 5000.
+
 ## Signals cancel the work; the exit is 128 + the signal
 
 SIGINT/SIGTERM are dispatch-sourced (`signal(sig, SIG_IGN)` first, then

@@ -62,6 +62,17 @@ relying on a contract; a wrong edge is discovered at runtime.
 **Discharge:** swift-libxray 0.2.0 pins the edges with tests; the guards stay as
 defense-in-depth.
 
+### TD-6 — renderer quality is fixture-driven — *open*, [#8](https://github.com/laconicman/elsewhere/issues/8)
+
+`Renderer` was tuned against the five fixtures in `Tests/ElsewhereKitTests/Fixtures/html`
+— real pages carry shapes they do not (Wikipedia's hatnotes and infobox spans, for
+instance, already render with cosmetic gaps).
+
+**Cost:** odd Markdown on pages unlike the fixtures; an agent gets the content but
+occasionally with flattened or awkward blocks.
+**Discharge:** real-world pages feed new fixtures, the block/inline rules iterate in
+M3's dogfood pass, and each fix lands with a golden.
+
 ## See Also
 
 - <doc:Design>
