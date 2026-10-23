@@ -27,7 +27,11 @@ six months behind upstream, per the plan's Appendix B).
 There is one Go runtime per process, so one running engine — and several exits at once are
 expressed as **one `mixed` inbound per exit** on 127.0.0.1 plus field routing to each
 exit's outbound (C4: two `runXray` instances are unsupported). `fetch --exit NAME` then
-just points URLSession at `in:<name>`'s port. **Rejected:** restarting the engine to
+just points URLSession at `in:<name>`'s port. Ownership is enforced at process scope:
+`TunnelSupervisor` claims the engine when it starts, a second live supervisor's `start`
+is refused rather than allowed to stop a core it doesn't own, and `stop` releases only
+its own claim — one supervisor per session is still the shape, `serve` (M2) will share
+sessions rather than engines. **Rejected:** restarting the engine to
 switch exits — slower and loses warm connections; several `XrayCore` instances —
 impossible.
 

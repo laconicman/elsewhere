@@ -1,5 +1,6 @@
 import Foundation
 internal import os
+import Synchronization
 import XrayCore // internal — the engine stays behind this module's own types (§5.1)
 
 /// Owns the one `XrayCore` run a process gets (§5.4): start builds and runs the
@@ -13,11 +14,19 @@ import XrayCore // internal — the engine stays behind this module's own types 
 /// A leftover running core (`isRunning` without `isUp` — a previous lifecycle leak)
 /// is stopped before the first attempt. Every `run`/`stop` is guarded by `isRunning`
 /// — the edges are unpinned until swift-libxray 0.2.0 (TD-5).
+///
+/// One engine, one owner, *process-wide*: `owner` is the supervisor that holds the
+/// core. A second supervisor's `start` is refused — never does it stop an engine it
+/// doesn't own — and `stop` releases ownership only for its holder.
 public actor TunnelSupervisor {
-    /// The lanes the running engine serves — `direct` among them (the builder adds it).
+    /// Who holds the engine, across every supervisor instance in the process.
+    private static let owner = Mutex<ObjectIdentifier?>(nil)
+    /// The lanes the running engine serves.
     public private(set) var lanes: [XrayConfigBuilder.Lane] = []
     /// True between a ready `start` and `stop` — the guard against double-start.
     public private(set) var isUp = false
+    /// True across a `start`'s awaits — the reentry guard `isUp` can't cover.
+    private var starting = false
 
     /// Test seam — defaults to the engine's `freePorts`. `nil` in the signature keeps
     /// the internal `XrayCore` out of a public default argument (same shape as Doctor).
@@ -49,7 +58,26 @@ public actor TunnelSupervisor {
         log: XrayConfigBuilder.XrayLog,
         excludingPorts: [UInt16]
     ) async throws(ElsewhereError) -> [XrayConfigBuilder.Lane] {
-        guard !isUp else { throw .tunnel("tunnel already running") }
+        guard !isUp, !starting else { throw .tunnel("tunnel already running") }
+        starting = true
+        defer { starting = false }
+        let me = ObjectIdentifier(self)
+        guard Self.owner.withLock({ held -> Bool in
+            if held == nil { held = me; return true }
+            return false
+        }) else {
+            // Another live supervisor owns the core — its engine is not ours to stop.
+            throw .tunnel(
+                "the engine is already in use by another session in this process")
+        }
+        var keepOwnership = false
+        defer {
+            if !keepOwnership {
+                Self.owner.withLock { if $0 == me { $0 = nil } }
+            }
+        }
+
+        // Ownership is ours — a running core here is a leftover lifecycle leak.
         if await XrayCore.shared.isRunning {
             logger.notice("a leftover engine instance is running; stopping it first")
             try? await XrayCore.shared.stop()
@@ -70,6 +98,10 @@ public actor TunnelSupervisor {
                 throw .engine(
                     "freePorts returned \(ports.count) candidates, "
                         + "needed \(needed)")
+            }
+            guard Set(ports).count == ports.count else {
+                // Two lanes on one port would fail `run` — name it instead (N10).
+                throw .engine("freePorts returned duplicate candidates")
             }
 
             var portsByName: [String: UInt16] = [:]
@@ -94,19 +126,39 @@ public actor TunnelSupervisor {
                 let message = Redactor.scrubPatterns(error.localizedDescription)
                 logger.warning("run failed on attempt \(attempt + 1): \(message)")
                 try? await XrayCore.shared.stop()
+                // A stop that didn't take leaves a running core `test`/`run` must
+                // not touch again — no retry on an unclean floor (TD-5).
+                guard !(await XrayCore.shared.isRunning) else {
+                    throw .engine(
+                        "\(message); the engine could not be stopped for a retry")
+                }
                 lastError = .engine(message)
                 continue
             }
 
             // `run` returns ~350 ms before the inbounds accept (swift-libxray TD-5) —
-            // poll each lane until a loopback connect succeeds.
+            // poll each lane until a loopback connect succeeds. A cancelled start is
+            // checked explicitly: under cancellation `isListening` fails fast and
+            // `Task.sleep` throws instantly, so without the check this is a hot spin
+            // to the deadline rather than a prompt unwind.
             for lane in built.lanes {
                 let deadline = ContinuousClock.now + readinessTimeout
                 var ready = false
                 while !ready, ContinuousClock.now < deadline {
+                    if Task.isCancelled {
+                        await stop()
+                        throw .tunnel("start cancelled")
+                    }
                     ready = await LoopbackProbe.isListening(
                         port: lane.inboundPort, timeout: .milliseconds(500))
-                    if !ready { try? await Task.sleep(for: .milliseconds(50)) }
+                    if !ready {
+                        do {
+                            try await Task.sleep(for: .milliseconds(50))
+                        } catch {
+                            await stop()
+                            throw .tunnel("start cancelled")
+                        }
+                    }
                 }
                 guard ready else {
                     await stop()
@@ -118,6 +170,7 @@ public actor TunnelSupervisor {
 
             lanes = built.lanes
             isUp = true
+            keepOwnership = true // ownership stays until stop()
             logger.notice("tunnel up: \(built.lanes.count) inbound lane(s)")
             return built.lanes
         }
@@ -125,10 +178,13 @@ public actor TunnelSupervisor {
         throw lastError ?? .engine("the engine failed to start")
     }
 
-    /// Stops the engine if it is running; never throws — the caller is tearing down
-    /// and a stuck core is logged, not fatal.
+    /// Stops the engine if it is running *and owned by this supervisor*; never
+    /// throws — the caller is tearing down and a stuck core is logged, not fatal.
+    /// Another session's core is neither stopped nor released here.
     public func stop() async {
-        if await XrayCore.shared.isRunning {
+        let me = ObjectIdentifier(self)
+        let mine = Self.owner.withLock { $0 == me }
+        if mine, await XrayCore.shared.isRunning {
             do {
                 try await XrayCore.shared.stop()
             } catch {
@@ -138,6 +194,9 @@ public actor TunnelSupervisor {
         }
         lanes = []
         isUp = false
+        if mine {
+            Self.owner.withLock { if $0 == me { $0 = nil } }
+        }
         logger.notice("tunnel stopped")
     }
 }
