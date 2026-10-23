@@ -15,10 +15,13 @@ public enum Redactor {
     static let visibleLinkKeys: Set<String> = ["type", "security", "mode"]
 
     /// Object keys whose values are secrets anywhere in an Xray outbound or the
-    /// generated config — the flat v26 outbound shape and the classic `vnext` one alike.
+    /// generated config — the flat v26 outbound shape and the classic `vnext` one
+    /// alike. `secretKey`/`preSharedKey`/`spiderX` cover WireGuard and REALITY's raw
+    /// forms; `user`/`email` because an account name is identifying too.
     static let secretKeys: Set<String> = [
         "id", "password", "publicKey", "privateKey", "shortId",
         "pbk", "sid", "key", "psk", "token", "pass", "uuid",
+        "secretKey", "preSharedKey", "spiderX", "email", "user",
     ]
 
     /// A share link with the credentials replaced: `vless://…@host:port?type=xhttp&
@@ -111,19 +114,29 @@ public enum Redactor {
     }
 
     /// The secret values a link carries — the userinfo (a VLESS UUID, a trojan password)
-    /// plus every `secretLinkKeys` value present — so an engine message that echoes the
-    /// input can be scrubbed with `scrub(_:secrets:)`.
+    /// plus every `secretLinkKeys` value present, in BOTH decoded and percent-encoded
+    /// form (`p@ss` and `p%40ss`): an engine error can echo either spelling, so the
+    /// scrub list carries both, deduplicated.
     public static func secrets(inLink link: String) -> [String] {
         guard let components = URLComponents(string: link) else { return [] }
         var found: [String] = []
-        if let user = components.user, !user.isEmpty { found.append(user) }
-        if let password = components.password, !password.isEmpty { found.append(password) }
-        for item in components.queryItems ?? [] {
+        for user in [components.user, components.percentEncodedUser].compactMap({ $0 })
+        where !user.isEmpty {
+            found.append(user)
+        }
+        for password in [components.password, components.percentEncodedPassword].compactMap({ $0 })
+        where !password.isEmpty {
+            found.append(password)
+        }
+        // `percentEncodedQueryItems` keeps the raw wire spelling — the key names carry
+        // no escapes, so the secretLinkKeys match holds on both lists.
+        for item in (components.queryItems ?? []) + (components.percentEncodedQueryItems ?? []) {
             if secretLinkKeys.contains(item.name), let value = item.value, !value.isEmpty {
                 found.append(value)
             }
         }
-        return found
+        var seen = Set<String>()
+        return found.filter { seen.insert($0).inserted }
     }
 
     /// Defensive second pass for free-form text that could embed a secret verbatim —

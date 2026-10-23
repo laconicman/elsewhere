@@ -37,6 +37,36 @@ struct RedactorTests {
         #expect(Set(Redactor.secrets(inLink: Synthetic.link)) == Set(Synthetic.secrets))
     }
 
+    @Test func linkSecretsCarryBothEncodings() {
+        // `p%40ss` on the wire decodes to `p@ss` — an engine error can echo either
+        // spelling, so the scrub list carries both.
+        let secrets = Set(Redactor.secrets(inLink: "trojan://p%40ss@host:443"))
+        #expect(secrets.contains("p@ss"))
+        #expect(secrets.contains("p%40ss"))
+    }
+
+    @Test func wireguardSecretKeyIsRedactedAndScrubbed() throws {
+        // A wireguard-shaped outbound: `secretKey` is the private key — redacted in
+        // the JSON and collected for message scrubbing like any other secret.
+        let outbound = try Self.json("""
+            {"protocol":"wireguard","settings":{
+             "secretKey":"WGSECRETWGSECRETWGSECRETWGSECRETWGSECRETWGS",
+             "preSharedKey":"PSKSECRETPSKSECRETPSKSECRETPSKSECRETPSKSE",
+             "address":["10.0.0.2/32"],"peers":[{"endpoint":"peer.example.com:51820"}]}}
+            """)
+        guard case .object(let object) = Redactor.redact(outbound),
+            case .object(let settings) = object["settings"]
+        else {
+            Issue.record("structure lost")
+            return
+        }
+        #expect(settings["secretKey"] == .string("…"))
+        #expect(settings["preSharedKey"] == .string("…"))
+        let text = "engine rejected WGSECRETWGSECRETWGSECRETWGSECRETWGSECRETWGS"
+        let scrubbed = Redactor.scrub(text, secrets: Redactor.secrets(in: outbound))
+        #expect(!scrubbed.contains("WGSECRET"))
+    }
+
     @Test func flatOutboundSecretsAreReplaced() throws {
         let redacted = Redactor.redact(try Self.json(Self.flatOutbound))
         guard case .object(let object) = redacted else {
