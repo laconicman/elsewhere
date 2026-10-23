@@ -249,6 +249,24 @@ extension Renderer {
         case "hr":
             // `---` is a Markdown delimiter — a rule just separates two blocks.
             return markdown ? ["---"] : []
+        case "a":
+            // A link wrapping blocks can't inline-wrap them — keep the blocks,
+            // then carry the destination as a link line of the `a`'s own text
+            // (80 chars, or "link" when empty).
+            var out = blocks(of: element, markdown: markdown, depth: depth)
+            let href = ((try? element.attr("href")) ?? "")
+                .trimmingCharacters(in: .whitespaces)
+            guard markdown, !href.isEmpty, !href.hasPrefix("#"),
+                !href.lowercased().hasPrefix("javascript:"),
+                Self.isLinkable(href, schemes: Self.linkableSchemes)
+            else { return out }
+            let text = trimBlock(inlineChildren(element, markdown: false,
+                                                depth: depth))
+                .replacingOccurrences(of: "\n", with: " ")
+            let label = text.isEmpty ? "link" : String(text.prefix(80))
+            let absolute = (try? element.absUrl("href")) ?? href
+            out.append("[\(label)](\(absolute))")
+            return out
         case "br":
             return []
         case "img":

@@ -173,6 +173,17 @@ struct RendererTests {
         #expect(rendered.contains("[m](mailto:a@b.c)"))
     }
 
+    /// A link wrapping block children can't inline-wrap them — the blocks stay
+    /// and the destination survives as a link line of the `a`'s own text.
+    @Test func aLinkWrappingBlocksKeepsItsDestination() {
+        let rendered = Renderer.render(
+            "<body><a href=\"/dest\"><div>Big block</div><p>more</p></a></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("Big block\n\nmore"))
+        #expect(rendered.contains("[Big block more](https://example.com/dest)"))
+    }
+
     /// `img` with a non-http(s) source renders its alt text alone.
     @Test func aNonHttpImageSourceRendersItsAlt() {
         let rendered = Renderer.render(
