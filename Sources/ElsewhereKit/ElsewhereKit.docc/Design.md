@@ -27,7 +27,11 @@ six months behind upstream, per the plan's Appendix B).
 There is one Go runtime per process, so one running engine — and several exits at once are
 expressed as **one `mixed` inbound per exit** on 127.0.0.1 plus field routing to each
 exit's outbound (C4: two `runXray` instances are unsupported). `fetch --exit NAME` then
-just points URLSession at `in:<name>`'s port. **Rejected:** restarting the engine to
+just points URLSession at `in:<name>`'s port. Ownership is enforced at process scope:
+`TunnelSupervisor` claims the engine when it starts, a second live supervisor's `start`
+is refused rather than allowed to stop a core it doesn't own, and `stop` releases only
+its own claim — one supervisor per session is still the shape, `serve` (M2) will share
+sessions rather than engines. **Rejected:** restarting the engine to
 switch exits — slower and loses warm connections; several `XrayCore` instances —
 impossible.
 
@@ -109,7 +113,10 @@ is the probe; `serve` may warm up at M2).
 `fetch` prints the decoded body and nothing else on stdout — an agent pipes it without
 a `sed`. Status lines, truncation and binary notices, and the `HTTP <status>` note go
 to stderr; `--json` replaces the body with the whole result object when a caller wants
-structure. HTTP ≥ 400 is a *result* — the command exits 0 — because the status is data
+structure. Printed URLs — the JSON fields, the redirect list, the stderr note — keep
+scheme, host, path and query but never userinfo: where a request went is data, a
+credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
+the status is data
 the agent reads (§5.5). **Rejected:** stderr-and-no-body on errors (loses the page's
 own error body) and a JSON envelope by default (most calls want the page).
 
@@ -135,7 +142,12 @@ everything lands in upper and lower case because tools disagree on which they re
 status is ours — 128 + signal on a signal death — and the parent ignores
 SIGINT/SIGTERM while it lives: the terminal already delivered them to the whole
 foreground group, so the child gets its own copy and the parent must outlive it to
-stop the tunnel. **Rejected:** per-app routing machinery (pf, a transparent proxy) —
+stop the tunnel. A `proxy` exit's configured URL — credentials included — is exported
+to the child's environment verbatim; the child needs it to authenticate, and that is
+the contract, said plainly. Task cancellation is forwarded to the child — `terminate()` (SIGTERM)
+first, a `SIGKILL` five seconds later if it still stands — and the reaped status
+(143/137) flows back like any other exit. **Rejected:** per-app routing machinery
+(pf, a transparent proxy) —
 heavier than the contract needs.
 
 ## `Renderer` walks SwiftSoup's DOM; escaping stays minimal

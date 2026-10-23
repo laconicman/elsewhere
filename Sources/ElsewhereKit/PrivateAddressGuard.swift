@@ -45,11 +45,12 @@ public enum PrivateAddressGuard {
         }
     }
 
-    /// Strict `inet_pton` — partial quads like `127.1` are not judged (they are not
-    /// four-octet literals; the exit's resolver decides them).
+    /// `inet_aton`, not `inet_pton` — resolvers accept the historical spellings
+    /// (`127.1`, `0x7f000001`, `2130706433`, `0177.0.0.1`), so the guard judges what
+    /// a resolver would connect to, not only strict quads.
     private static func ipv4Octets(_ name: String) -> [UInt8]? {
         var address = in_addr()
-        guard name.withCString({ inet_pton(AF_INET, $0, &address) }) == 1 else {
+        guard name.withCString({ inet_aton($0, &address) }) != 0 else {
             return nil
         }
         return withUnsafeBytes(of: address.s_addr) { Array($0) }

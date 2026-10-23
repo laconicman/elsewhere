@@ -27,7 +27,7 @@ struct WhoAmICommand: AsyncParsableCommand {
     var json = false
 
     func validate() throws {
-        if all, exits.exitName != nil || all, exits.direct {
+        if all && (exits.exitName != nil || exits.direct) {
             throw ValidationError("--all covers every exit; drop --exit/--direct")
         }
     }
@@ -36,7 +36,7 @@ struct WhoAmICommand: AsyncParsableCommand {
         try await exitingWithStatus { () async throws(ElsewhereError) -> Int32 in
             let config = try options.store.load(
                 environment: ProcessInfo.processInfo.environment)
-            let ua = config.userAgent.string
+            let ua = config.userAgent.headerValue
             // Sorted exits, direct last — a stable order a reader can diff.
             let names = all ? config.exits.keys.sorted() + ["direct"] : []
             return try await withSignalCancellation { () async throws(ElsewhereError) in

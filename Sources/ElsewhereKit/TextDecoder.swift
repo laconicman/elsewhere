@@ -52,12 +52,20 @@ public enum TextDecoder {
         ].contains(mediaType)
     }
 
-    /// The `charset=…` parameter of a Content-Type value, if present.
+    /// The `charset=…` parameter of a Content-Type value, if present — matching
+    /// surrounding quotes stripped (`charset="utf-8"` is legal HTTP).
     static func charsetParameter(of contentType: String?) -> String? {
         contentType?.split(separator: ";").dropFirst()
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .first { $0.lowercased().hasPrefix("charset=") }
-            .map { String($0.dropFirst("charset=".count)) }
+            .map { raw in
+                var value = String(raw.dropFirst("charset=".count))
+                if value.count >= 2,
+                    (value.hasPrefix("\"") && value.hasSuffix("\""))
+                        || (value.hasPrefix("'") && value.hasSuffix("'"))
+                { value = String(value.dropFirst().dropLast()) }
+                return value
+            }
     }
 
     /// `<meta charset=…>` or `<meta http-equiv … charset=…>` inside the first 2 KB.

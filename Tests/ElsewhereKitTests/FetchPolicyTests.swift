@@ -96,3 +96,36 @@ struct TraceParserTests {
         #expect(trace.ip == "203.0.113.9")
     }
 }
+
+/// The four supported schemes build; anything else is a named `.exit`, never a
+/// silent CONNECT (`ProxyConfiguration` isn't introspectable — construction is the
+/// observable).
+@Suite("ProxySessionFactory — the scheme decides the transport")
+struct ProxySessionFactoryTests {
+    @Test(arguments: ["http", "https", "socks5", "socks5h"])
+    func supportedSchemesBuild(scheme: String) throws {
+        let url = try #require(URL(string: "\(scheme)://u:p@proxy.example:1080"))
+        _ = try ProxySessionFactory.configuration(for: .external(exit: "x", url: url))
+    }
+
+    @Test func anUnknownSchemeIsAnExitError() throws {
+        let url = try #require(URL(string: "gopher://proxy.example:70"))
+        do {
+            _ = try ProxySessionFactory.configuration(for: .external(exit: "x", url: url))
+            Issue.record("expected .exit")
+        } catch ElsewhereError.exit(let message) {
+            #expect(message.contains("scheme 'gopher'"))
+            #expect(message.contains("supported"))
+        }
+    }
+
+    @Test func aMissingPortIsAnExitError() throws {
+        let url = try #require(URL(string: "http://proxy.example"))
+        do {
+            _ = try ProxySessionFactory.configuration(for: .external(exit: "x", url: url))
+            Issue.record("expected .exit")
+        } catch ElsewhereError.exit(let message) {
+            #expect(message.contains("host:port"))
+        }
+    }
+}

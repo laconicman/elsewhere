@@ -40,7 +40,9 @@ public enum XrayConfigBuilder {
     ///     here; URLSession talks to them directly (§5.5).
     ///   - ports: inbound port per exit name, from `XrayCore.freePorts` (candidates, not
     ///     reservations — TD-2).
-    ///   - directPort: the `direct` lane's inbound port.
+    ///   - directPort: the `direct` lane's inbound port — `nil` emits no `direct`
+    ///     inbound/outbound/rule/lane at all (A9: only the lanes a call needs are
+    ///     built; `Doctor`/`ExitValidator` still validate the full shape).
     ///   - bindInterface: the resolved interface name (`nil` = `BindInterface.none` —
     ///     `--via-system`), applied to every outbound including `direct` (§3.3).
     ///   - log: the `log` block — ``XrayLog/silent`` by default, since the engine's
@@ -49,7 +51,7 @@ public enum XrayConfigBuilder {
     public static func build(
         exits: [(name: String, outbound: JSONValue)],
         ports: [String: UInt16],
-        directPort: UInt16,
+        directPort: UInt16?,
         bindInterface: String?,
         log: XrayLog = .silent
     ) throws(ElsewhereError) -> (configJSON: String, lanes: [Lane]) {
@@ -70,16 +72,18 @@ public enum XrayConfigBuilder {
                 inboundTag: "in:\(name)", outboundTag: "out:\(name)"))
         }
 
-        // `direct` is implicit, always present, never configurable away (§5.2) — and
-        // binds the interface too, so `--direct` is genuinely direct (§3.3).
-        inbounds.append(inbound(tag: "in:direct", port: directPort))
-        outbounds.append(try normalize(
-            .object(["protocol": .string("freedom")]),
-            tag: "out:direct", interface: bindInterface))
-        rules.append(rule(inbound: "in:direct", outbound: "out:direct"))
-        lanes.append(Lane(
-            exitName: "direct", inboundPort: directPort,
-            inboundTag: "in:direct", outboundTag: "out:direct"))
+        // `direct` exists when the caller asks for it (`nil` = not this call, A9) —
+        // and binds the interface too, so `--direct` is genuinely direct (§3.3).
+        if let directPort {
+            inbounds.append(inbound(tag: "in:direct", port: directPort))
+            outbounds.append(try normalize(
+                .object(["protocol": .string("freedom")]),
+                tag: "out:direct", interface: bindInterface))
+            rules.append(rule(inbound: "in:direct", outbound: "out:direct"))
+            lanes.append(Lane(
+                exitName: "direct", inboundPort: directPort,
+                inboundTag: "in:direct", outboundTag: "out:direct"))
+        }
 
         let root = JSONValue.object([
             "log": logBlock(log),

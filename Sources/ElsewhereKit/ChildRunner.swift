@@ -1,4 +1,5 @@
 import Foundation
+import Synchronization
 
 /// `elsewhere run -- CMD` (§5.7): the child gets proxy env vars pointing at the route,
 /// inherits stdio, and its status is ours. `Process` against `/usr/bin/env` gives the
@@ -39,7 +40,10 @@ public enum ChildRunner {
     /// 128 + signal when it dies to one (`terminationReason == .uncaughtSignal`).
     /// SIGINT/SIGTERM are ignored in the parent for the child's lifetime: the terminal
     /// delivers them to the whole foreground group, so the child gets its own copy —
-    /// and the parent must outlive it to stop the tunnel afterwards.
+    /// and the parent must outlive it to stop the tunnel afterwards. Cancellation of
+    /// the waiting task is forwarded too: `terminate()` (SIGTERM) first, a detached
+    /// `SIGKILL` 5 s later if the child still stands — its reaped status (143/137)
+    /// then flows back like any other.
     /// - Throws: `.usage` for an empty command; `.fetch` when the launch itself fails.
     public static func run(_ command: [String], via route: Route) async throws(ElsewhereError) -> Int32 {
         guard !command.isEmpty else { throw .usage("run needs a command after `--`") }
@@ -49,28 +53,48 @@ public enum ChildRunner {
             signal(SIGINT, previousInt)
             signal(SIGTERM, previousTerm)
         }
-        return try await withCheckedThrowingContinuation {
-            (continuation: CheckedContinuation<Int32, ElsewhereError>) in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
-            process.arguments = command
-            process.environment = environment(
-                for: route, base: ProcessInfo.processInfo.environment)
-            // Stdio inherited — the child's output is the point.
-            process.terminationHandler = { finished in
-                continuation.resume(
-                    returning: finished.terminationReason == .uncaughtSignal
-                        ? 128 + finished.terminationStatus
-                        : finished.terminationStatus)
+        // The launched child, shared with the cancellation handler — nil until
+        // `run()` lands; a cancel racing the launch is caught by the isCancelled
+        // check right after.
+        let child = Mutex<Process?>(nil)
+        // A Result, not a throwing continuation — `withTaskCancellationHandler`
+        // erases typed throws to `any Error`.
+        let outcome: Result<Int32, ElsewhereError> = await withTaskCancellationHandler {
+            await withCheckedContinuation {
+                (continuation: CheckedContinuation<Result<Int32, ElsewhereError>, Never>) in
+                let process = Process()
+                process.executableURL = URL(fileURLWithPath: "/usr/bin/env")
+                process.arguments = command
+                process.environment = environment(
+                    for: route, base: ProcessInfo.processInfo.environment)
+                // Stdio inherited — the child's output is the point.
+                process.terminationHandler = { finished in
+                    continuation.resume(
+                        returning: .success(
+                            finished.terminationReason == .uncaughtSignal
+                                ? 128 + finished.terminationStatus
+                                : finished.terminationStatus))
+                }
+                do {
+                    try process.run()
+                    child.withLock { $0 = process }
+                    if Task.isCancelled { process.terminate() }
+                } catch {
+                    continuation.resume(
+                        returning: .failure(
+                            .fetch(
+                                "cannot launch \(command[0]): "
+                                    + Redactor.scrubPatterns(error.localizedDescription))))
+                }
             }
-            do {
-                try process.run()
-            } catch {
-                continuation.resume(
-                    throwing: ElsewhereError.fetch(
-                        "cannot launch \(command[0]): "
-                            + Redactor.scrubPatterns(error.localizedDescription)))
+        } onCancel: {
+            guard let process = child.withLock({ $0 }), process.isRunning else { return }
+            process.terminate()
+            Task.detached {
+                try? await Task.sleep(for: .seconds(5))
+                if process.isRunning { kill(process.processIdentifier, SIGKILL) }
             }
         }
+        return try outcome.get()
     }
 }

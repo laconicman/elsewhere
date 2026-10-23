@@ -73,6 +73,17 @@ occasionally with flattened or awkward blocks.
 **Discharge:** real-world pages feed new fixtures, the block/inline rules iterate in
 M3's dogfood pass, and each fix lands with a golden.
 
+### TD-7 — the body is read byte by byte — *open*, [#14](https://github.com/laconicman/elsewhere/issues/14)
+
+`Fetcher` consumes `session.bytes(for:)`'s `AsyncBytes` one `UInt8` at a time so the
+5 MB cap can cut mid-stream. Measured 2026-10-24: the 5.6 MB loopback body through a
+live engine lane completes in ~0.6 s (~9 MB/s) — fine for 0.1.0.
+
+**Cost:** per-byte iteration is roughly an order of magnitude slower than a
+`dataTask` delegate buffer; it shows only on multi-MB responses.
+**Discharge:** rewrite the read path as a `URLSessionDataDelegate` accumulating
+`Data` chunks if the measurement ever says it matters — it does not yet.
+
 ## See Also
 
 - <doc:Design>

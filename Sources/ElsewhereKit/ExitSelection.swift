@@ -14,6 +14,8 @@ public enum ExitSelection: Sendable, Equatable {
         case .direct:
             return "direct"
         case .named(let name):
+            // `--exit direct` names the lane — it is never a stored exit.
+            if name == "direct" { return "direct" }
             guard config.exits[name] != nil else {
                 throw .exit("no exit named '\(name)'")
             }

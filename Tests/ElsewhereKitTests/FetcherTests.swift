@@ -17,7 +17,7 @@ struct FetcherTests {
         defer { server.stop() }
         let supervisor = TunnelSupervisor()
         let lanes = try await supervisor.start(
-            exits: [], bindInterface: nil, log: .silent, excludingPorts: [])
+            exits: [], includeDirect: true, bindInterface: nil, log: .silent, excludingPorts: [])
         do {
             try await body(
                 .inbound(exit: "direct", port: lanes[0].inboundPort),
@@ -99,17 +99,33 @@ struct FetcherTests {
         }
     }
 
+    /// `--timeout` bounds the whole fetch, not one read: a trickle beats every
+    /// per-read wait but the resource bound still fires at the limit.
+    @Test func aTricklingBodyHitsTheResourceTimeout() async throws {
+        try await withServerAndRoute { route, base in
+            var slow = request(base.appendingPathComponent("trickle"))
+            slow.timeout = .seconds(1)
+            let began = ContinuousClock.now
+            do {
+                _ = try await Fetcher.fetch(slow, via: route)
+                Issue.record("expected .fetch")
+            } catch ElsewhereError.fetch {
+                #expect(ContinuousClock.now - began < .seconds(3))
+            }
+        }
+    }
+
     @Test func headReturnsHeadersAndNoBody() async throws {
         try await withServerAndRoute { route, base in
             let result = try await Fetcher.fetch(
                 request(base.appendingPathComponent("head"), method: .head), via: route)
             #expect(result.status == 200)
             #expect(result.body.isEmpty)
-            #expect(result.headers["Content-Length"] != nil)
+            #expect(result.headers["content-length"] != nil)
         }
     }
 
-    @Test func aRefusedDestinationIsAFetchError() async throws {
+    @Test func aConnectionRefusedPortIsAFetchError() async throws {
         // A port that was bound and is now closed — connection refused.
         let closed = try TestHTTPServer()
         let closedPort = try await closed.start()

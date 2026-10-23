@@ -58,6 +58,8 @@ public struct FetchResult: Sendable {
     public var requestURL: URL
     public var finalURL: URL
     public var status: Int
+    /// Response headers, keys lowercased — `headers["content-type"]`, not the wire
+    /// spelling (HTTP field names are case-insensitive; one normalization for all).
     public var headers: [String: String]
     public var contentType: String?
     public var body: Data
@@ -134,14 +136,23 @@ enum ProxySessionFactory {
             let target = NWEndpoint.hostPort(host: .init(host), port: endpoint)
             let configuration: ProxyConfiguration
             switch url.scheme?.lowercased() {
-            case "socks5", "socks5h":
-                configuration = ProxyConfiguration(socksv5Proxy: target)
+            case "http":
+                configuration = ProxyConfiguration(httpCONNECTProxy: target)
             case "https":
                 // TLS to the proxy itself, then CONNECT inside it.
                 configuration = ProxyConfiguration(
                     httpCONNECTProxy: target, tlsOptions: NWProtocolTLS.Options())
-            default:
-                configuration = ProxyConfiguration(httpCONNECTProxy: target)
+            case "socks5", "socks5h":
+                configuration = ProxyConfiguration(socksv5Proxy: target)
+            case .some(let scheme):
+                // An unknown scheme must not silently become a CONNECT proxy.
+                throw .exit(
+                    "proxy exit '\(exit)' has scheme '\(scheme)'; "
+                        + "http, https, socks5 and socks5h are supported")
+            case .none:
+                throw .exit(
+                    "proxy exit '\(exit)' has no scheme; "
+                        + "http, https, socks5 and socks5h are supported")
             }
             if let user = url.user, !user.isEmpty {
                 configuration.applyCredential(username: user, password: url.password ?? "")
@@ -210,6 +221,11 @@ public enum Fetcher {
     {
         try PrivateAddressGuard.check(request.url, allowPrivate: request.allowPrivate)
         let proxy = try ProxySessionFactory.configuration(for: route)
+        // An external proxy's URL carries credentials — transport errors can echo it.
+        let secrets: [String]
+        if case .external(_, let proxyURL) = route {
+            secrets = Redactor.secrets(inLink: proxyURL.absoluteString)
+        } else { secrets = [] }
 
         let delegate = RedirectDelegate(request: request)
         let configuration = URLSessionConfiguration.ephemeral
@@ -218,8 +234,11 @@ public enum Fetcher {
         configuration.httpCookieAcceptPolicy = .never
         configuration.waitsForConnectivity = false
         let timeout = request.timeout.components
-        configuration.timeoutIntervalForRequest =
-            TimeInterval(timeout.seconds) + TimeInterval(timeout.attoseconds) / 1e18
+        let interval = TimeInterval(timeout.seconds)
+            + TimeInterval(timeout.attoseconds) / 1e18
+        configuration.timeoutIntervalForRequest = interval
+        // …and for the resource — `--timeout` bounds the whole fetch, not one read.
+        configuration.timeoutIntervalForResource = interval
         configuration.urlCache = nil
         let session = URLSession(configuration: configuration)
         defer { session.invalidateAndCancel() }
@@ -264,7 +283,7 @@ public enum Fetcher {
                 finalURL: http.url ?? request.url,
                 status: http.statusCode,
                 headers: http.allHeaderFields.reduce(into: [:]) {
-                    $0["\($1.key)"] = "\($1.value)"
+                    $0["\($1.key)".lowercased()] = "\($1.value)"
                 },
                 contentType: http.value(forHTTPHeaderField: "Content-Type"),
                 body: body,
@@ -279,7 +298,9 @@ public enum Fetcher {
             throw .fetch("interrupted")
         } catch {
             if let refusal = delegate.refusal { throw refusal }
-            throw .fetch(Redactor.scrubPatterns(error.localizedDescription))
+            throw .fetch(
+                Redactor.scrubPatterns(
+                    Redactor.scrub(error.localizedDescription, secrets: secrets)))
         }
     }
 }

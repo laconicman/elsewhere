@@ -75,7 +75,8 @@ elsewhere run --exit moldova -- git clone https://…  # HTTP(S)_/ALL_PROXY expo
 lines, truncation and binary notices, the `HTTP <status>` note. `--json` prints the
 whole result object instead; `--head` prints status and headers; `--output FILE`
 saves the raw body. Defaults: GET, up to 10 redirects (each hop re-checked by the
-private-address guard), a 25 s timeout, a 5 MB body cap, and a Chrome User-Agent
+private-address guard), a 25 s timeout that bounds the *whole* fetch — a body that
+trickles a byte at a time still hits it — a 5 MB body cap, and a Chrome User-Agent
 (`--user-agent` overrides). HTTP ≥ 400 is a *result*, not a failure — exit stays 0;
 the status is data the agent reads. Private/local destinations are refused unless
 `--allow-private` — the tool reaches everywhere the tunnel does, so a mistyped URL
@@ -107,7 +108,8 @@ the system VPN when one is up. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) write
 engine's warnings to a file; silent by default, since Xray's console log is stdout
 and stdout here is the payload. `run`'s child gets `HTTP_PROXY`/`HTTPS_PROXY` at
 `http://127.0.0.1:PORT` and `ALL_PROXY` at `socks5h://127.0.0.1:PORT` (the `h` keeps
-DNS remote) for a tunnel lane — or the exit's own URL for a `proxy` exit — plus
+DNS remote) for a tunnel lane — or the exit's own URL for a `proxy` exit, credentials
+included: the child needs them to authenticate, and they are exported verbatim — plus
 `NO_PROXY` covering loopback, in upper and lower case.
 
 ### The config file

@@ -18,6 +18,16 @@ struct TextDecoderTests {
         #expect(decoded.encoding == "windows-1251")
     }
 
+    /// `charset="windows-1251"` — quoted parameter values are legal HTTP and must
+    /// still decode, not fall through to a wrong guess.
+    @Test func aQuotedCharsetDecodes() throws {
+        let decoded = try #require(
+            TextDecoder.decode(
+                cp1251Body, contentType: "text/plain; charset=\"windows-1251\""))
+        #expect(decoded.text == cp1251)
+        #expect(decoded.encoding == "windows-1251")
+    }
+
     @Test func utf8BOMDecodesAsUTF8() throws {
         var body = Data([0xEF, 0xBB, 0xBF])
         body.append(Data("hello".utf8))
