@@ -176,7 +176,7 @@ extension Renderer {
             return text.isEmpty ? [] : [text]
         case "ul", "ol":
             return listItems(element, ordered: element.tagName() == "ol",
-                             depth: 0, markdown: markdown)
+                             indent: "", markdown: markdown, depth: depth)
         case "li":
             return ["- " + trimBlock(inline(element, markdown: markdown, depth: depth))]
         case "blockquote":
@@ -212,13 +212,16 @@ extension Renderer {
         }
     }
 
-    /// `ul`/`ol` items, nested lists carried two spaces per level — the whole list
-    /// is one block of lines. An `li`'s non-list children render inline; a nested
-    /// `ul`/`ol` recurses at `depth + 1`.
+    /// `ul`/`ol` items — the whole list is one block of lines. A nested list
+    /// indents to its parent item's text column, the marker's width (`- ` is 2,
+    /// `10. ` is 4 — Markdown reads children by that column, not a fixed two).
+    /// A non-list block child inside an `li` (`pre`, `table`, `blockquote`,
+    /// headings, a second `p`) renders as its own block at the text column
+    /// after a blank line; text after a nested list is a continuation paragraph
+    /// the same way — the blank line keeps it off the last nested item.
     private static func listItems(
-        _ list: Element, ordered: Bool, depth: Int, markdown: Bool
+        _ list: Element, ordered: Bool, indent: String, markdown: Bool, depth: Int
     ) -> [String] {
-        let indent = String(repeating: "  ", count: depth)
         var lines: [String] = []
         // ol[start] seeds the counter; numbering continues from the emitted value.
         var number = ordered
@@ -232,33 +235,45 @@ extension Renderer {
             { number = value } // li[value] overrides; the next item counts on
             let bullet = ordered ? "\(number). " : "- "
             number += 1
+            let column = indent + String(repeating: " ", count: bullet.count)
+
+            // Every line after the first continues at the item's text column.
+            func indentLines(_ text: String) -> String {
+                text.split(separator: "\n", omittingEmptySubsequences: false)
+                    .map { column + $0 }.joined(separator: "\n")
+            }
 
             // Children in document order: an `li` is text runs interleaved with
-            // nested lists. The first text run is the item's own line; a text run
-            // after a list is a continuation line at the item's text column.
-            enum Segment { case text(String); case list([String]) }
+            // nested lists and block children — each plays a different part.
+            enum Segment { case text(String); case list(String); case block([String]) }
             var segments: [Segment] = []
             var buffer = ""
             for node in child.getChildNodes() {
-                if let element = node as? Element,
-                    ["ul", "ol"].contains(element.tagName().lowercased())
-                {
+                guard let element = node as? Element else {
+                    if let text = node as? TextNode {
+                        buffer += collapse(text.text())
+                    }
+                    continue
+                }
+                let tag = element.tagName().lowercased()
+                if (tag == "ul" || tag == "ol"), depth + 2 < maxDepth {
                     if !buffer.isEmpty {
                         segments.append(.text(buffer))
                         buffer = ""
                     }
-                    if depth + 1 < maxDepth {
-                        segments.append(.list(listItems(
-                            element, ordered: element.tagName() == "ol",
-                            depth: depth + 1, markdown: markdown)))
-                    } else { // past the cap a nested list is collapsed text
-                        buffer += inline(element, markdown: markdown,
-                                         depth: depth + 1)
+                    segments.append(.list(listItems(
+                        element, ordered: tag == "ol", indent: column,
+                        markdown: markdown, depth: depth + 2).joined()))
+                } else if isBlock(element, depth: depth + 2) {
+                    if !buffer.isEmpty {
+                        segments.append(.text(buffer))
+                        buffer = ""
                     }
-                } else if let text = node as? TextNode {
-                    buffer += collapse(text.text())
-                } else if let element = node as? Element {
-                    buffer += inline(element, markdown: markdown, depth: depth + 2)
+                    segments.append(.block(block(element, markdown: markdown,
+                                                 depth: depth + 2)))
+                } else {
+                    buffer += inline(element, markdown: markdown,
+                                     depth: depth + 2)
                 }
             }
             if !buffer.isEmpty { segments.append(.text(buffer)) }
@@ -272,19 +287,43 @@ extension Renderer {
                     let text = escapeLineStarts(trimBlock(raw), markdown: markdown)
                     if text.isEmpty { continue }
                     if bulletUsed {
-                        let column = indent
-                            + String(repeating: " ", count: bullet.count)
-                        lines.append(column + text)
+                        lines.append("")
+                        lines.append(indentLines(text))
                     } else {
-                        lines.append(indent + bullet + text)
+                        var itemLines = text.split(
+                            separator: "\n", omittingEmptySubsequences: false)
+                            .map(String.init)
+                        if let first = itemLines.first {
+                            lines.append(indent + bullet + first)
+                            itemLines.removeFirst()
+                        }
+                        lines += itemLines.map { column + $0 }
                         bulletUsed = true
                     }
                 case .list(let nested):
+                    if nested.isEmpty { continue }
                     if !bulletUsed {
                         lines.append(indent + bullet)
                         bulletUsed = true
                     }
-                    lines += nested
+                    lines.append(nested)
+                case .block(let children):
+                    var pending = children.filter { !$0.isEmpty }
+                    if !bulletUsed {
+                        // A one-line block joins the bullet; multi-line content
+                        // stands alone, indented, after a blank line.
+                        if let first = pending.first, !first.contains("\n") {
+                            lines.append(indent + bullet + first)
+                            pending.removeFirst()
+                        } else {
+                            lines.append(indent + bullet)
+                        }
+                        bulletUsed = true
+                    }
+                    for childBlock in pending {
+                        lines.append("")
+                        lines.append(indentLines(childBlock))
+                    }
                 }
             }
             if !bulletUsed {

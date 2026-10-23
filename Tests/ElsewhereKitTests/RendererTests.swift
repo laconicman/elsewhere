@@ -287,13 +287,44 @@ struct RendererTests {
     }
 
     /// Text around a nested list keeps document order: before → item line,
-    /// nested items, after → a continuation line at the item's text column.
+    /// nested items, after → a continuation paragraph at the text column after
+    /// a blank line (no blank line and it joins the last nested item).
     @Test func itemTextAroundANestedListKeepsDocumentOrder() {
         let rendered = Renderer.render(
             "<body><ul><li>before<ul><li>nested</li></ul>after</li></ul></body>",
             contentType: "text/html",
             finalURL: URL(string: "https://example.com")!, format: .markdown)
-        #expect(rendered.contains("- before\n  - nested\n  after"))
+        #expect(rendered.contains("- before\n  - nested\n\n  after"))
+    }
+
+    /// The nested indent is the parent marker's width — a `10. ` item's
+    /// children need four spaces, not two.
+    @Test func nestedIndentIsTheParentMarkersWidth() {
+        let rendered = Renderer.render(
+            "<body><ol start=\"10\"><li>parent<ul><li>child</li></ul></li></ol></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("10. parent\n    - child"))
+    }
+
+    /// A non-list block child inside an `li` renders as its own block at the
+    /// text column after a blank line — a `pre` keeps its lines, fenced.
+    @Test func aListItemKeepsItsBlockChildren() {
+        let rendered = Renderer.render(
+            "<body><ul><li>item<pre>a\n  b</pre></li></ul></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("- item\n\n  ```\n  a\n    b\n  ```"))
+    }
+
+    /// A multi-paragraph item: the first block joins the bullet, the second is
+    /// a blank-line-separated block at the text column.
+    @Test func aMultiParagraphItemContinuesAtTheTextColumn() {
+        let rendered = Renderer.render(
+            "<body><ul><li><p>one</p><p>two</p></li></ul></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("- one\n\n  two"))
     }
 
     @Test func tableEscapesPipesAndFlattensCells() {
