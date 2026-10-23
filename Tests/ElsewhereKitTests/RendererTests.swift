@@ -239,12 +239,14 @@ struct RendererTests {
 
     @Test func blockStartMarkersAreEscaped() {
         let rendered = Renderer.render(
-            "<body><p># not a heading</p><p>- not a list</p><p>1. not numbered</p></body>",
+            "<body><p># not a heading</p><p>- not a list</p><p>1. not numbered</p><p>2026</p></body>",
             contentType: "text/html",
             finalURL: URL(string: "https://example.com")!, format: .markdown)
         #expect(rendered.contains("\\# not a heading"))
         #expect(rendered.contains("\\- not a list"))
         #expect(rendered.contains("1\\. not numbered"))
+        // A bare number is not a list marker — and must not trip the index scan.
+        #expect(rendered.contains("\n2026\n"))
     }
 
     // MARK: - text format

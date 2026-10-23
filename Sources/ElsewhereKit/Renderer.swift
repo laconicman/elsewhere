@@ -319,10 +319,11 @@ extension Renderer {
         if first.isNumber {
             var i = text.startIndex
             while i < text.endIndex, text[i].isNumber { i = text.index(after: i) }
+            guard i < text.endIndex, text[i] == "." else { return text }
             let afterDot = text.index(after: i)
-            if i < text.endIndex, text[i] == ".",
-                afterDot < text.endIndex, text[afterDot] == " "
-            { return String(text[..<i]) + "\\." + text[afterDot...] }
+            if afterDot < text.endIndex, text[afterDot] == " " {
+                return String(text[..<i]) + "\\." + text[afterDot...]
+            }
         }
         return text
     }
