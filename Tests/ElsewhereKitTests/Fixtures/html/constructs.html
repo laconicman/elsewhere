@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+    <title>Every Construct &amp; Then Some</title>
+    <meta charset="utf-8">
+    <style>.never { color: red; }</style>
+</head>
+<body>
+    <nav><a href="/nav">Site nav link</a></nav>
+    <header><p>Site header chrome</p></header>
+    <main>
+        <h1>A heading &amp; its entity</h1>
+        <p>First paragraph with <strong>strong</strong>, <em>em</em>, <b>b</b>,
+            <i>i</i>, and an <a href="rel/page">relative link</a> plus an
+            <a href="https://example.com/abs">absolute link</a>.</p>
+        <p>Second paragraph&nbsp;with a non-breaking space and a<br>line break.</p>
+        <h2 id="lists">Lists</h2>
+        <ul>
+            <li>one</li>
+            <li>two with <code>inline code</code>
+                <ul>
+                    <li>nested a</li>
+                    <li>nested b
+                        <ul><li>deep c</li></ul>
+                    </li>
+                </ul>
+            </li>
+            <li>three</li>
+        </ul>
+        <ol>
+            <li>first</li>
+            <li>second</li>
+        </ol>
+        <h2>Code</h2>
+        <pre><code class="language-swift">let x = 1
+if x &lt; 2 { print("hi") }</code></pre>
+        <pre class="lang-python"><code>def f():
+    pass</code></pre>
+        <pre><code>no language at all</code></pre>
+        <p>Inline code with a backtick: <code>a`b</code> — needs double ticks.</p>
+        <h2>Quote &amp; table</h2>
+        <blockquote>
+            <p>Quoted line one</p>
+            <p>Quoted line two</p>
+        </blockquote>
+        <table>
+            <tr><th>Name</th><th>Value</th></tr>
+            <tr><td>a|b</td><td>1</td></tr>
+            <tr><td>multi<br>line</td><td>2</td></tr>
+        </table>
+        <table>
+            <tr><td>r1c1</td><td>r1c2</td></tr>
+            <tr><td>r2c1</td><td>r2c2</td></tr>
+        </table>
+        <hr>
+        <h3>Images &amp; odd links</h3>
+        <p><img src="img/pic.png" alt="a pic"> <img src="/root.png" alt="rooted">
+            <a href="javascript:void(0)">do nothing</a>
+            <a href="#lists">jump back</a>
+            <a href="https://example.com"></a>
+            <a href="https://example.com/imglink"><img src="in.png" alt="linked img"></a></p>
+        <div hidden>hidden content</div>
+        <aside>an aside</aside>
+        <template><p>template content</p></template>
+        <form><input value="x"></form>
+        <iframe src="x.html"></iframe>
+        <noscript>noscript text</noscript>
+        <svg><rect/></svg>
+        <script>var inline = 1;</script>
+        <script src="app.js"></script>
+    </main>
+    <footer><p>footer content</p></footer>
+</body>
+</html>

@@ -1,0 +1,12 @@
+fl=352f90
+h=example.org
+ip=203.0.113.9
+ts=1760000000.000
+visit_scheme=https
+uag=Mozilla/5.0
+colo=AAA
+http=http/2
+loc=ZZ
+tls=TLSv1.3
+warp=off
+gateway=off
