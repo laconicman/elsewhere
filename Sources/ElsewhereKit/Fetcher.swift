@@ -219,6 +219,11 @@ public enum Fetcher {
     {
         try PrivateAddressGuard.check(request.url, allowPrivate: request.allowPrivate)
         let proxy = try ProxySessionFactory.configuration(for: route)
+        // An external proxy's URL carries credentials — transport errors can echo it.
+        let secrets: [String]
+        if case .external(_, let proxyURL) = route {
+            secrets = Redactor.secrets(inLink: proxyURL.absoluteString)
+        } else { secrets = [] }
 
         let delegate = RedirectDelegate(request: request)
         let configuration = URLSessionConfiguration.ephemeral
@@ -291,7 +296,9 @@ public enum Fetcher {
             throw .fetch("interrupted")
         } catch {
             if let refusal = delegate.refusal { throw refusal }
-            throw .fetch(Redactor.scrubPatterns(error.localizedDescription))
+            throw .fetch(
+                Redactor.scrubPatterns(
+                    Redactor.scrub(error.localizedDescription, secrets: secrets)))
         }
     }
 }

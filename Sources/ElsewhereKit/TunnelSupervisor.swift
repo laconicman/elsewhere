@@ -27,6 +27,9 @@ public actor TunnelSupervisor {
     public private(set) var isUp = false
     /// True across a `start`'s awaits — the reentry guard `isUp` can't cover.
     private var starting = false
+    /// The running exits' outbound secrets — `test`/`run`/`stop` messages and logs
+    /// can echo config text back, so every printable form is scrubbed with these.
+    private var secrets: [String] = []
 
     /// Test seam — defaults to the engine's `freePorts`. `nil` in the signature keeps
     /// the internal `XrayCore` out of a public default argument (same shape as Doctor).
@@ -83,6 +86,9 @@ public actor TunnelSupervisor {
             try? await XrayCore.shared.stop()
         }
 
+        // Everything the engine might echo back — kept for stop() too.
+        secrets = exits.flatMap { Redactor.secrets(in: $0.outbound) }
+
         let excluded = [LocalProxy.incyPort] + excludingPorts
         var lastError: ElsewhereError?
         for attempt in 0...1 {
@@ -92,7 +98,7 @@ public actor TunnelSupervisor {
             do {
                 ports = try await portCandidates(needed, excluded)
             } catch {
-                throw .engine(Redactor.scrubPatterns(error.localizedDescription))
+                throw .engine(scrub(error.localizedDescription))
             }
             guard ports.count == needed else {
                 throw .engine(
@@ -116,14 +122,14 @@ public actor TunnelSupervisor {
             do {
                 try await XrayCore.shared.test(configJSON: built.configJSON)
             } catch {
-                throw .engine(Redactor.scrubPatterns(error.localizedDescription))
+                throw .engine(scrub(error.localizedDescription))
             }
             do {
                 try await XrayCore.shared.run(configJSON: built.configJSON)
             } catch {
                 // run() failing leaves the instance in unknown state — stop it, draw
                 // fresh candidates, try once more (the taken-port race, TD-2/A3).
-                let message = Redactor.scrubPatterns(error.localizedDescription)
+                let message = scrub(error.localizedDescription)
                 logger.warning("run failed on attempt \(attempt + 1): \(message)")
                 try? await XrayCore.shared.stop()
                 // A stop that didn't take leaves a running core `test`/`run` must
@@ -188,15 +194,20 @@ public actor TunnelSupervisor {
             do {
                 try await XrayCore.shared.stop()
             } catch {
-                logger.warning(
-                    "stop failed: \(Redactor.scrubPatterns(error.localizedDescription))")
+                logger.warning("stop failed: \(self.scrub(error.localizedDescription))")
             }
         }
         lanes = []
         isUp = false
+        secrets = []
         if mine {
             Self.owner.withLock { if $0 == me { $0 = nil } }
         }
         logger.notice("tunnel stopped")
+    }
+
+    /// The known secrets first, then the pattern net for what couldn't be enumerated.
+    private func scrub(_ text: String) -> String {
+        Redactor.scrubPatterns(Redactor.scrub(text, secrets: secrets))
     }
 }

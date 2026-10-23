@@ -119,15 +119,16 @@ struct FetchCommand: AsyncParsableCommand {
             }
             let elapsed = result.elapsed.components
             let payload = Payload(
-                url: result.requestURL.absoluteString,
-                finalURL: result.finalURL.absoluteString,
+                // Printed URLs keep everything but userinfo — a credential is not data.
+                url: Redactor.redact(url: result.requestURL),
+                finalURL: Redactor.redact(url: result.finalURL),
                 status: result.status,
                 contentType: result.contentType,
                 exit: result.exit,
                 elapsedMs: elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000,
                 bytes: result.body.count,
                 truncated: result.truncated,
-                redirects: result.redirects.map(\.absoluteString),
+                redirects: result.redirects.map(Redactor.redact(url:)),
                 headers: result.headers,
                 body: decoded?.text)
             let encoder = JSONEncoder()
@@ -160,7 +161,9 @@ struct FetchCommand: AsyncParsableCommand {
             printError("body truncated at 5 MB")
         }
         if result.status >= 400 {
-            printError("HTTP \(result.status) from \(result.finalURL.absoluteString)")
+            // host + path, no scheme — the pattern scrub strips `scheme://` tokens.
+            let host = result.finalURL.host(percentEncoded: false) ?? "-"
+            printError("HTTP \(result.status) from \(host)\(result.finalURL.path())")
         }
     }
 }

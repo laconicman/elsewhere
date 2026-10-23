@@ -113,7 +113,10 @@ is the probe; `serve` may warm up at M2).
 `fetch` prints the decoded body and nothing else on stdout — an agent pipes it without
 a `sed`. Status lines, truncation and binary notices, and the `HTTP <status>` note go
 to stderr; `--json` replaces the body with the whole result object when a caller wants
-structure. HTTP ≥ 400 is a *result* — the command exits 0 — because the status is data
+structure. Printed URLs — the JSON fields, the redirect list, the stderr note — keep
+scheme, host, path and query but never userinfo: where a request went is data, a
+credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
+the status is data
 the agent reads (§5.5). **Rejected:** stderr-and-no-body on errors (loses the page's
 own error body) and a JSON envelope by default (most calls want the page).
 
@@ -139,7 +142,9 @@ everything lands in upper and lower case because tools disagree on which they re
 status is ours — 128 + signal on a signal death — and the parent ignores
 SIGINT/SIGTERM while it lives: the terminal already delivered them to the whole
 foreground group, so the child gets its own copy and the parent must outlive it to
-stop the tunnel. Task cancellation is forwarded to the child — `terminate()` (SIGTERM)
+stop the tunnel. A `proxy` exit's configured URL — credentials included — is exported
+to the child's environment verbatim; the child needs it to authenticate, and that is
+the contract, said plainly. Task cancellation is forwarded to the child — `terminate()` (SIGTERM)
 first, a `SIGKILL` five seconds later if it still stands — and the reaped status
 (143/137) flows back like any other exit. **Rejected:** per-app routing machinery
 (pf, a transparent proxy) —

@@ -87,7 +87,8 @@ the system VPN when one is up. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) write
 engine's warnings to a file; silent by default, since Xray's console log is stdout
 and stdout here is the payload. `run`'s child gets `HTTP_PROXY`/`HTTPS_PROXY` at
 `http://127.0.0.1:PORT` and `ALL_PROXY` at `socks5h://127.0.0.1:PORT` (the `h` keeps
-DNS remote) for a tunnel lane — or the exit's own URL for a `proxy` exit — plus
+DNS remote) for a tunnel lane — or the exit's own URL for a `proxy` exit, credentials
+included: the child needs them to authenticate, and they are exported verbatim — plus
 `NO_PROXY` covering loopback, in upper and lower case.
 
 ### The config file

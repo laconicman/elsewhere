@@ -1,4 +1,4 @@
-import Foundation
+public import Foundation // URL is public API (redact(url:))
 
 /// The funnel every printable form of a link or outbound passes through (§5.2): the
 /// link is the secret, and it never reaches a log, an error message, or a tool result
@@ -128,6 +128,17 @@ public enum Redactor {
             result += ":\(port)"
         }
         return result
+    }
+
+    /// The URL without its userinfo — scheme, host, port, path, query and fragment
+    /// kept. For printed `url`/`finalURL`/`redirects`: where the request went is
+    /// data, a credential in its userinfo is not.
+    public static func redact(url: URL) -> String {
+        guard var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        else { return marker }
+        components.user = nil
+        components.password = nil
+        return components.string ?? marker
     }
 
     /// The secret values a link carries — the userinfo (a VLESS UUID, a trojan password)
