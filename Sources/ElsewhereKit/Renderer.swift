@@ -583,29 +583,30 @@ extension Renderer {
         switch element.tagName().lowercased() {
         case "br": return "\n"
         case "code":
-            let content = trimBlock(
-                inlineChildren(element, markdown: markdown, depth: depth))
-            if content.isEmpty { return "" }
-            guard markdown else { return content }
+            let raw = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(raw)
+            guard markdown, !content.isEmpty else { return raw }
             // The delimiter must outlive the longest backtick run inside;
             // content that begins or ends with a backtick gets a space of
             // padding (CommonMark 6.1 — ` ``x`` ` needs the spaces to parse).
             let fence = String(repeating: "`", count: longestBacktickRun(content) + 1)
             let padded = content.hasPrefix("`") || content.hasSuffix("`")
-            return fence + (padded ? " " : "") + content + (padded ? " " : "") + fence
+            return withEdgeSpaces(
+                raw, around:
+                    fence + (padded ? " " : "") + content + (padded ? " " : "") + fence)
         case "a":
-            let content = trimBlock(
-                inlineChildren(
-                    element, markdown: markdown, depth: depth, inLinkLabel: true))
-            guard markdown else { return content }
+            let raw = inlineChildren(
+                element, markdown: markdown, depth: depth, inLinkLabel: true)
+            let content = trimBlock(raw)
+            guard markdown else { return raw }
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
             guard !content.isEmpty, !href.isEmpty,
                 !href.lowercased().hasPrefix("javascript:"), !href.hasPrefix("#"),
                 Self.isLinkable(href, schemes: Self.linkableSchemes)
-            else { return content }
+            else { return raw }
             let absolute = (try? element.absUrl("href")) ?? href
-            return linkMarkdown(content, href: absolute)
+            return withEdgeSpaces(raw, around: linkMarkdown(content, href: absolute))
         case "img":
             let alt = ((try? element.attr("alt")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -617,16 +618,27 @@ extension Renderer {
             else { return alt }
             return "![\(alt)](\(absolute))"
         case "strong", "b":
-            let content = trimBlock(
-                inlineChildren(element, markdown: markdown, depth: depth))
-            return markdown && !content.isEmpty ? "**\(content)**" : content
+            let raw = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(raw)
+            guard markdown, !content.isEmpty else { return raw }
+            return withEdgeSpaces(raw, around: "**\(content)**")
         case "em", "i":
-            let content = trimBlock(
-                inlineChildren(element, markdown: markdown, depth: depth))
-            return markdown && !content.isEmpty ? "*\(content)*" : content
+            let raw = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(raw)
+            guard markdown, !content.isEmpty else { return raw }
+            return withEdgeSpaces(raw, around: "*\(content)*")
         default:
             return inlineChildren(element, markdown: markdown, depth: depth)
         }
+    }
+
+    /// `x<b> y </b>z` needs its edge whitespace OUTSIDE the delimiters —
+    /// `** y **` won't parse (CommonMark 6.2: `**` can't carry inner spaces)
+    /// — so each side of `raw` that carried whitespace gives one literal space.
+    private static func withEdgeSpaces(_ raw: String, around delimited: String) -> String {
+        (raw.first?.isWhitespace == true ? " " : "")
+            + delimited
+            + (raw.last?.isWhitespace == true ? " " : "")
     }
 
     /// Collapse, never trim — a `<span> </span>` between words IS their space;

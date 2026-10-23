@@ -278,6 +278,25 @@ struct RendererTests {
         #expect(rendered.contains("alpha beta"))
     }
 
+    /// `** y **` won't parse — an inline element's edge whitespace moves
+    /// outside its delimiters, one literal space a side (CommonMark 6.2).
+    @Test func edgeWhitespaceMovesOutsideTheDelimiters() {
+        let rendered = Renderer.render(
+            "<body><p>August<b> 1983</b>, the<a href=\"/d\"> docs</a> for "
+                + "Hello<em> world</em> x<code> y </code>z</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("August **1983**"))
+        #expect(rendered.contains("the [docs](https://example.com/d) for"))
+        #expect(rendered.contains("Hello *world*"))
+        #expect(rendered.contains("x `y` z"))
+        let text = Renderer.render(
+            "<body><p>Hello<em> world</em></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .text)
+        #expect(text.contains("Hello world"))
+    }
+
     /// The `Source:` footer follows the `--json` rule — a credentialled URL's
     /// userinfo never reaches stdout.
     @Test func theSourceFooterDropsUserinfo() {
