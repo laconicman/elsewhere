@@ -33,8 +33,10 @@ impossible.
 
 ## HTTP CONNECT, not SOCKS
 
-The `mixed` inbound speaks both; the client uses HTTP CONNECT (an `HTTPProxyConfiguration`
-on the URLSession). **Why:** CONNECT is explicit about its destination and easy to audit;
+The `mixed` inbound speaks both; the client uses HTTP CONNECT — the URLSession gets
+`URLSessionConfiguration.proxyConfigurations` carrying a
+`ProxyConfiguration(httpCONNECTProxy:)` (Network framework, macOS 14+). **Why:** CONNECT
+is explicit about its destination and easy to audit;
 SOCKS5 would do the same job. **Rejected:** nothing stronger than "one had to be picked";
 the inbound keeps both ears anyway.
 

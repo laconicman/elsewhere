@@ -4,7 +4,9 @@ Milestones, priority-ordered — each is one GitHub milestone on `laconicman/els
 titled with the tag it closes into. Rationale lives in <doc:Design>; the plan record is
 `../TASK-code-elsewhere.md` §7.
 
-## M1 · fetch — *in progress* (no tag of its own; lands in 0.1.0)
+## M1 · fetch — *in progress*
+
+The first tag, `0.1.0`, is cut when M2 (`serve`) lands; M1 has no tag.
 
 Done when `elsewhere fetch https://1.1.1.1/cdn-cgi/trace` prints `loc=<exit country>`
 through the default exit and `--direct` prints the ISP's; `whoami --all` shows both

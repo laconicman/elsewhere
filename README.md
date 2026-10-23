@@ -25,7 +25,8 @@ bypass the system tunnel that owns the default route.
 ## Status
 
 **M1 (fetch) in progress** — this build has the config model, `exits` and `doctor`;
-`fetch`/`whoami`/`run` land next, `serve` (MCP) with M2. The first tag is `0.1.0`.
+`fetch`/`whoami`/`run` land next, `serve` (MCP) with M2. The first tag, `0.1.0`, is cut
+when M2 (`serve`) lands; M1 has no tag.
 
 ## Requirements
 
