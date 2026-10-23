@@ -84,7 +84,8 @@ public enum Renderer {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if !title.isEmpty { out.append(markdown ? "# \(title)" : title) }
         if !body.isEmpty { out.append(body) }
-        out.append("Source: \(finalURL.absoluteString)")
+        // Same rule as --json: a credentialled URL's userinfo never reaches stdout.
+        out.append("Source: \(Redactor.redact(url: finalURL))")
         return out.joined(separator: "\n\n") + "\n"
     }
 

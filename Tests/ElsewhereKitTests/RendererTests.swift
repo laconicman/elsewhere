@@ -205,6 +205,18 @@ struct RendererTests {
         #expect(rendered.contains("text\n\npara\n\ntail *e*"))
     }
 
+    /// The `Source:` footer follows the `--json` rule — a credentialled URL's
+    /// userinfo never reaches stdout.
+    @Test func theSourceFooterDropsUserinfo() {
+        let rendered = Renderer.render(
+            "<body><p>x</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://user:secret@example.com/p")!,
+            format: .markdown)
+        #expect(rendered.contains("Source: https://example.com/p"))
+        #expect(!rendered.contains("secret"))
+    }
+
     @Test func nestedListsIndentTwoSpacesPerLevel() {
         let rendered = Renderer.render(
             "<body><ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>"
