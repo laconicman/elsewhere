@@ -472,42 +472,71 @@ extension Renderer {
         return whole ? joined : collapseLines(joined)
     }
 
-    /// GFM table: the first `tr` carrying a `th` is the header — else the first row —
-    /// then a `|---|` separator and the body rows. Cells flatten inline, `|` is
-    /// escaped, newlines collapse to a space.
+    /// GFM table: the first `tr` carrying a `th` is the header — else the first
+    /// row — then a `|---|` separator and the body rows. Rows come from the
+    /// table's own `thead`/`tbody`/`tfoot`/`tr` children, so a nested table keeps
+    /// its rows. `colspan` fans a cell into that many cells (the value, then
+    /// empties); `rowspan` is ignored — a spanning cell appears once, on its own
+    /// row. Every row pads with empty cells to the widest, so a narrow header
+    /// never drops a column. `caption` is a bold line before the table (plain
+    /// in text mode). Cells flatten inline, `|` is escaped, newlines collapse.
     private static func table(_ table: Element, markdown: Bool, depth: Int) -> [String] {
-        guard let rows = try? table.select("tr"), rows.count > 0 else { return [] }
+        var rows: [Element] = []
+        var caption = ""
+        for child in table.children() {
+            switch child.tagName().lowercased() {
+            case "caption":
+                caption = trimBlock(
+                    inline(child, markdown: markdown, depth: depth + 1))
+            case "tr":
+                rows.append(child)
+            case "thead", "tbody", "tfoot":
+                rows += child.children().filter { $0.tagName().lowercased() == "tr" }
+            default: break
+            }
+        }
+        guard !rows.isEmpty else { return [] }
         func cells(_ row: Element) -> [String] {
-            (try? row.select("th, td"))?.map { cell in
-                trimBlock(inline(cell, markdown: markdown, depth: depth + 2))
+            row.children().flatMap { cell -> [String] in
+                guard ["td", "th"].contains(cell.tagName().lowercased())
+                else { return [] }
+                let text = trimBlock(
+                    inline(cell, markdown: markdown, depth: depth + 2))
                     .replacingOccurrences(of: "\n", with: " ")
-            } ?? []
+                let span = (try? cell.attr("colspan"))
+                    .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 1
+                return [text] + Array(repeating: "", count: max(0, span - 1))
+            }
         }
-        func gfmCells(_ row: Element) -> [String] {
-            cells(row).map { $0.replacingOccurrences(of: "|", with: "\\|") }
+        var grid = rows.map(cells)
+        let width = grid.map(\.count).max() ?? 0
+        guard width > 0 else { return [] }
+        for index in grid.indices where grid[index].count < width {
+            grid[index] += Array(repeating: "", count: width - grid[index].count)
         }
+        let title = caption.isEmpty ? [] : [markdown ? "**\(caption)**" : caption]
         if !markdown {
             // Plain text has no pipes: one line per row, two spaces between cells.
-            let lines = rows.compactMap { row -> String? in
-                let line = cells(row).joined(separator: "  ")
+            let lines = grid.compactMap { row -> String? in
+                let line = row.joined(separator: "  ")
                 return line.isEmpty ? nil : line
             }
-            return lines.isEmpty ? [] : [lines.joined(separator: "\n")]
+            return title + (lines.isEmpty ? [] : [lines.joined(separator: "\n")])
+        }
+        func gfm(_ row: [String]) -> String {
+            "| " + row
+                .map { $0.replacingOccurrences(of: "|", with: "\\|") }
+                .joined(separator: " | ") + " |"
         }
         let headerIndex = rows.firstIndex { row in
-            ((try? row.select("th"))?.first()) != nil
+            row.children().contains { $0.tagName().lowercased() == "th" }
         } ?? 0
-        let header = gfmCells(rows[headerIndex])
-        guard !header.isEmpty else { return [] }
-        var lines = ["| " + header.joined(separator: " | ") + " |"]
-        lines.append("|" + String(repeating: "---|", count: header.count))
-        for (index, row) in rows.enumerated() where index != headerIndex {
-            let body = gfmCells(row)
-            if !body.isEmpty {
-                lines.append("| " + body.joined(separator: " | ") + " |")
-            }
+        var lines = [gfm(grid[headerIndex])]
+        lines.append("|" + String(repeating: "---|", count: width))
+        for (index, row) in grid.enumerated() where index != headerIndex {
+            if row.contains(where: { !$0.isEmpty }) { lines.append(gfm(row)) }
         }
-        return [lines.joined(separator: "\n")]
+        return title + [lines.joined(separator: "\n")]
     }
 
     /// Everything inside one element as inline Markdown. Text nodes collapse —

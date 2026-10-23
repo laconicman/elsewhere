@@ -336,6 +336,54 @@ struct RendererTests {
         #expect(rendered.contains("| A | B |\n|---|---|\n| x\\|y | m n |"))
     }
 
+    /// A narrow header pads to the widest row — the value column survives
+    /// instead of vanishing into a 1-cell header (the Wikipedia infobox case).
+    @Test func raggedRowsPadToTheWidest() {
+        let rendered = Renderer.render(
+            "<body><table><tr><th>Name</th></tr>"
+                + "<tr><td>Release</td><td>1983</td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("| Name |  |"))
+        #expect(rendered.contains("|---|---|"))
+        #expect(rendered.contains("| Release | 1983 |"))
+    }
+
+    /// `colspan` fans a cell across its span — the value, then empty cells.
+    @Test func colspanFansACellAcrossItsSpan() {
+        let rendered = Renderer.render(
+            "<body><table><tr><td colspan=\"2\">wide</td><td>x</td></tr>"
+                + "<tr><td>a</td><td>b</td><td>c</td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("| wide |  | x |"))
+        #expect(rendered.contains("| a | b | c |"))
+    }
+
+    /// `caption` is a bold line before the table; plain line in text mode.
+    @Test func aCaptionLeadsTheTable() {
+        let url = URL(string: "https://example.com")!
+        let html = "<body><table><caption>Results</caption>"
+            + "<tr><td>x</td></tr></table></body>"
+        #expect(Renderer.render(html, contentType: "text/html", finalURL: url,
+                                format: .markdown).contains("**Results**\n\n|"))
+        #expect(Renderer.render(html, contentType: "text/html", finalURL: url,
+                                format: .text).contains("Results\n\nx"))
+    }
+
+    /// A nested table's rows stay inside their cell — they never join the
+    /// outer table's row list.
+    @Test func nestedTableRowsStayInsideTheirCell() {
+        let rendered = Renderer.render(
+            "<body><table><tr><td>outer</td><td><table><tr><td>in</td></tr>"
+                + "</table></td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        // One outer row only — the inner `tr` did not become a second row.
+        #expect(rendered.contains("| outer | in |\n|---|---|\n"))
+        #expect(!rendered.contains("\n| in |"))
+    }
+
     @Test func tableWithoutHeaderUsesFirstRow() {
         let rendered = Renderer.render(
             "<body><table><tr><td>h1</td><td>h2</td></tr><tr><td>a</td><td>b</td></tr></table></body>",
