@@ -35,6 +35,13 @@ public enum Renderer {
         "Note: this page appears to be rendered by JavaScript; "
         + "the HTML shell carried little content."
 
+    /// The schemes an emitted link may carry — a fetched page can contain
+    /// someone's share link as content; the Markdown output never makes a
+    /// non-web scheme actionable (Design).
+    static let linkableSchemes: Set<String> = ["http", "https", "mailto"]
+    /// Images only ride http(s) — any other scheme renders as the alt text.
+    static let imageSchemes: Set<String> = ["http", "https"]
+
     /// - Parameters:
     ///   - text: the decoded body (`TextDecoder` decides text vs binary earlier).
     ///   - contentType: the response's Content-Type, if any.
@@ -292,6 +299,16 @@ extension Renderer {
         return markdown ? "\(fence)\(language)\n\(code)\n\(fence)" : code
     }
 
+    /// Does `href` name a destination the output may make actionable? A relative
+    /// reference has no scheme — it resolves against the page and is fine; an
+    /// explicit scheme outside the allowlist renders as text alone.
+    static func isLinkable(_ href: String, schemes: Set<String>) -> Bool {
+        guard !href.isEmpty else { return false }
+        guard let scheme = URLComponents(string: href)?.scheme?.lowercased()
+        else { return true }
+        return schemes.contains(scheme)
+    }
+
     /// The longest run of `` ` `` in `text` — a delimiter must be one longer.
     private static func longestBacktickRun(_ text: String) -> Int {
         var longest = 0
@@ -374,7 +391,8 @@ extension Renderer {
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
             guard !content.isEmpty, !href.isEmpty,
-                !href.lowercased().hasPrefix("javascript:"), !href.hasPrefix("#")
+                !href.lowercased().hasPrefix("javascript:"), !href.hasPrefix("#"),
+                Self.isLinkable(href, schemes: Self.linkableSchemes)
             else { return content }
             let absolute = (try? element.absUrl("href")) ?? href
             return "[\(content)](\(absolute))"
@@ -382,9 +400,12 @@ extension Renderer {
             let alt = ((try? element.attr("alt")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
             guard markdown else { return alt }
-            let src = (try? element.absUrl("src")) ?? ""
-            guard !src.isEmpty else { return alt }
-            return "![\(alt)](\(src))"
+            let src = ((try? element.attr("src")) ?? "")
+                .trimmingCharacters(in: .whitespaces)
+            guard Self.isLinkable(src, schemes: Self.imageSchemes),
+                let absolute = try? element.absUrl("src"), !absolute.isEmpty
+            else { return alt }
+            return "![\(alt)](\(absolute))"
         case "strong", "b":
             let content = inlineChildren(element, markdown: markdown)
             return markdown && !content.isEmpty ? "**\(content)**" : content

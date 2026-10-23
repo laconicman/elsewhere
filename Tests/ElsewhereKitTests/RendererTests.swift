@@ -154,6 +154,37 @@ struct RendererTests {
         #expect(rendered.contains("go jump\n")) // text stays, syntax and empty link go
     }
 
+    /// A page's non-web scheme stays content — the output never makes `file:`,
+    /// `data:` or a share link actionable; http(s) and mailto still link.
+    @Test func nonWebSchemeLinksRenderAsTheirText() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"file:///etc/passwd\">f</a> "
+                + "<a href=\"data:text/plain,x\">d</a> "
+                + "<a href=\"vless://00000000-0000-0000-0000-000000000000@h:443\">v</a> "
+                + "<a href=\"https://e.com/p\">ok</a> "
+                + "<a href=\"mailto:a@b.c\">m</a></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("f d v"))
+        #expect(!rendered.contains("file:"))
+        #expect(!rendered.contains("data:"))
+        #expect(!rendered.contains("vless:"))
+        #expect(rendered.contains("[ok](https://e.com/p)"))
+        #expect(rendered.contains("[m](mailto:a@b.c)"))
+    }
+
+    /// `img` with a non-http(s) source renders its alt text alone.
+    @Test func aNonHttpImageSourceRendersItsAlt() {
+        let rendered = Renderer.render(
+            "<body><p><img src=\"data:image/png;base64,xx\" alt=\"pixel\"> "
+                + "<img src=\"/p.png\" alt=\"rel\"></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("pixel"))
+        #expect(!rendered.contains("data:"))
+        #expect(rendered.contains("![rel](https://example.com/p.png)"))
+    }
+
     /// A container whose children are text and inline elements without a wrapping
     /// `<p>` is ONE paragraph — the link survives and the words stay together
     /// (the layout-lines defect: they used to split into separate blocks).

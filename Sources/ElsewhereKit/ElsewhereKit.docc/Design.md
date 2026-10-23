@@ -164,7 +164,11 @@ marker it prevents. **The JavaScript-shell note is honest:** when a page carried
 `script[src]`s but renders under 200 characters, `fetch` appends
 `_Note: this page appears to be rendered by JavaScript; the HTML shell carried
 little content._` — a shell pretending to be content is worse than a named limit.
-Rendering applies only to what `TextDecoder` calls text: a trace body or a JSON
+**Links are allowlisted:** only `http`, `https` and `mailto` destinations become
+`[text](…)` — a page can carry someone's share link as content, but the Markdown
+output never turns a non-web scheme into an actionable link; an `img` whose
+`src` is not http(s) renders as its alt. Rendering applies only to what
+`TextDecoder` calls text: a trace body or a JSON
 document passes through byte-exact for every format, and `raw` always is. Fixtures
 are captured pages, one per shape — a GitHub README, a Wikipedia article, an Apple
 Documentation SPA shell — plus a hand-written `constructs.html` carrying every
