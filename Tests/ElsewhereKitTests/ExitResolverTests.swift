@@ -20,7 +20,7 @@ struct ExitResolverTests {
         #expect(settings["port"] == .number(8443))
     }
 
-    @Test func malformedLinkIsAConfigError() async {
+    @Test func malformedLinkIsAnEngineError() async {
         do {
             _ = try await ExitResolver.outbound(for: .link("vless://not-a-link"), named: "x")
             Issue.record("expected a throw")

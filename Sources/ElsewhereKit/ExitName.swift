@@ -11,7 +11,7 @@ public enum ExitName {
     public static func validate(_ name: String) throws(ElsewhereError) {
         // The same alphabet as DNS labels, minus the dots — a Regex literal, like
         // swift-libxray's tag check (stored on a static it would be non-Sendable).
-        guard name.wholeMatch(of: /[a-z0-9][a-z0-9-]{0,31}/) != nil else {
+        guard name.wholeMatch(of: /[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?/) != nil else {
             throw .exit(
                 "invalid exit name; must match ^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$")
         }

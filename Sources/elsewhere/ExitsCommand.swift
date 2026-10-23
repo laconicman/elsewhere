@@ -42,7 +42,7 @@ struct ExitsAdd: AsyncParsableCommand {
         """
     )
 
-    @Argument(help: "Exit name: ^[a-z0-9][a-z0-9-]{0,31}$, not `direct` or `env`.")
+    @Argument(help: "Exit name: ^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$, not `direct` or `env`.")
     var name: String
 
     @Option(help: "A share link; `-` reads one line from stdin (keeps the secret out of shell history).")

@@ -5,13 +5,13 @@ import Testing
 /// `env` are claimed by the implicit exits.
 @Suite("ExitName — validation and reserved names")
 struct ExitNameTests {
-    @Test(arguments: ["moldova", "kz-2", "a", "0"])
+    @Test(arguments: ["moldova", "kz-2", "a", "0", String(repeating: "a", count: 32)])
     func acceptsValid(_ name: String) throws {
         try ExitName.validate(name)
     }
 
     @Test(arguments: [
-        "Moldova", "my_exit", "a.b", "-x",
+        "Moldova", "my_exit", "a.b", "-x", "foo-",
         String(repeating: "a", count: 33),
         "direct", "env",
     ])

@@ -85,6 +85,8 @@ holds the secrets. Hand-editable; a redacted shape:
 - `bindInterface`: `"auto"` (default — the current path's first physical interface),
   an interface name, or `"none"`. Applied to *every* outbound, including `direct`.
 - `userAgent`: `"chrome"` (default) or a literal string.
+- Exit names match `^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$` — DNS-label-shaped, so never
+  a leading or trailing dash — and `direct`/`env` are reserved.
 
 ### Environment
 

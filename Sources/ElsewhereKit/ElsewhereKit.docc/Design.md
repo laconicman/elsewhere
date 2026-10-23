@@ -111,8 +111,9 @@ history), and a default-on `direct` exit row in the file (it's code, not config)
 
 ## Exit names are routing tags
 
-A name must match `^[a-z0-9][a-z0-9-]{0,31}$` (DNS-label alphabet, no dots) because it
-becomes the inbound tag `in:<name>` and a CLI argument. Reserved: `direct`, `env`.
+A name must match `^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$` — DNS-label-shaped: the
+alphabet without dots, and no leading or trailing dash — because it becomes the
+inbound tag `in:<name>` and a CLI argument. Reserved: `direct`, `env`.
 
 ## Exit statuses are a contract
 
