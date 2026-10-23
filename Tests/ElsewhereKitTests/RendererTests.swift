@@ -219,6 +219,17 @@ struct RendererTests {
         #expect(rendered.contains("[`a]b`](https://example.com/u)"))
     }
 
+    /// An `#`-anchor never becomes a link, so its text keeps bare brackets —
+    /// escaping is for emitted labels only (Wikipedia's `[1]` footnotes).
+    @Test func bracketsEscapeOnlyInsideAnEmittedLabel() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"#n\">[1]</a> <a href=\"/u\">[2]</a></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.hasPrefix("[1] "))
+        #expect(rendered.contains("[\\[2\\]](https://example.com/u)"))
+    }
+
     /// A link wrapping block children can't inline-wrap them — the blocks stay
     /// and the destination survives as a link line of the `a`'s own text.
     @Test func aLinkWrappingBlocksKeepsItsDestination() {

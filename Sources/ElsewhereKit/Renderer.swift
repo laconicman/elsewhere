@@ -602,16 +602,19 @@ extension Renderer {
                 raw, around:
                     fence + (padded ? " " : "") + content + (padded ? " " : "") + fence)
         case "a":
-            let raw = inlineChildren(
-                element, markdown: markdown, depth: depth, inLinkLabel: true)
-            let content = trimBlock(raw)
-            guard markdown else { return raw }
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
-            guard !content.isEmpty, !href.isEmpty,
-                !href.lowercased().hasPrefix("javascript:"), !href.hasPrefix("#"),
-                Self.isLinkable(href, schemes: Self.linkableSchemes)
-            else { return raw }
+            // Brackets escape only inside a label that is emitted — an anchor
+            // or a non-web href renders its text and keeps the brackets bare.
+            let qualifies = !href.isEmpty
+                && !href.lowercased().hasPrefix("javascript:")
+                && !href.hasPrefix("#")
+                && Self.isLinkable(href, schemes: Self.linkableSchemes)
+            let raw = inlineChildren(
+                element, markdown: markdown, depth: depth,
+                inLinkLabel: markdown && qualifies)
+            let content = trimBlock(raw)
+            guard markdown, qualifies, !content.isEmpty else { return raw }
             let absolute = (try? element.absUrl("href")) ?? href
             return withEdgeSpaces(raw, around: linkMarkdown(content, href: absolute))
         case "img":

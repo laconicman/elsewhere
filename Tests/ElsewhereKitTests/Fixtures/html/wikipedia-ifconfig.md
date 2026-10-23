@@ -19,7 +19,7 @@ Many Linux distributions have deprecated ifconfig in favor of the [iproute2](htt
 
 [[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=1)]
 
-Common uses for ifconfig include setting the [IP address](https://en.wikipedia.org/wiki/IP_address) and [subnet mask](https://en.wikipedia.org/wiki/Subnet_mask) of a network interface and disabling or enabling an interface.\[1\] At boot time, many Unix-like operating systems initialize their network interfaces with [shell scripts](https://en.wikipedia.org/wiki/Shell_script) that call ifconfig. As an interactive tool, system administrators routinely use the utility to display and analyze network interface parameters. The following two examples show the output of the tool when querying the state of a single active interface each on a [Linux](https://en.wikipedia.org/wiki/Linux)-based host (interface [eth](https://en.wikipedia.org/wiki/Ethernet)0) and the [ural0](https://en.wikipedia.org/wiki/Ralink) interface on an [OpenBSD](https://en.wikipedia.org/wiki/OpenBSD) installation.
+Common uses for ifconfig include setting the [IP address](https://en.wikipedia.org/wiki/IP_address) and [subnet mask](https://en.wikipedia.org/wiki/Subnet_mask) of a network interface and disabling or enabling an interface.[1] At boot time, many Unix-like operating systems initialize their network interfaces with [shell scripts](https://en.wikipedia.org/wiki/Shell_script) that call ifconfig. As an interactive tool, system administrators routinely use the utility to display and analyze network interface parameters. The following two examples show the output of the tool when querying the state of a single active interface each on a [Linux](https://en.wikipedia.org/wiki/Linux)-based host (interface [eth](https://en.wikipedia.org/wiki/Ethernet)0) and the [ural0](https://en.wikipedia.org/wiki/Ralink) interface on an [OpenBSD](https://en.wikipedia.org/wiki/OpenBSD) installation.
 
 ```
  eth0      Link encap:Ethernet  HWaddr 00:0F:20:CF:8B:42
@@ -63,9 +63,9 @@ ifconfig wlan0 up
 
 The [Berkeley Software Distribution](https://en.wikipedia.org/wiki/Berkeley_Software_Distribution) [UNIX](https://en.wikipedia.org/wiki/UNIX) operating systems (e.g., [NetBSD](https://en.wikipedia.org/wiki/NetBSD), [OpenBSD](https://en.wikipedia.org/wiki/OpenBSD), and [FreeBSD](https://en.wikipedia.org/wiki/FreeBSD)) continue active development of ifconfig and extension of its functionality to cover the configuration of [wireless networking](https://en.wikipedia.org/wiki/Wireless_network) interfaces, [VLAN](https://en.wikipedia.org/wiki/VLAN) trunking, controlling hardware features such as [TSO](https://en.wikipedia.org/wiki/TCP_segmentation_offloading) or hardware checksumming or setting up bridge and tunnel interfaces. [Solaris](<https://en.wikipedia.org/wiki/Solaris_(operating_system)>) has historically used ifconfig for all network interface configuration, but as of Solaris 10 introduced dladm to perform data-link (OSI model layer 2) configuration, reducing ifconfig's purview to IP configuration.
 
-In older [Linux distributions](https://en.wikipedia.org/wiki/Linux_distribution), ifconfig, in conjunction with the utility [route](<https://en.wikipedia.org/wiki/Route_(command)>), was used to connect a computer to a network, and to define routes between networks. ifconfig for Linux is part of the package *net-tools*, released as the latest version 2.10 on 7 January 2021.\[2\]
+In older [Linux distributions](https://en.wikipedia.org/wiki/Linux_distribution), ifconfig, in conjunction with the utility [route](<https://en.wikipedia.org/wiki/Route_(command)>), was used to connect a computer to a network, and to define routes between networks. ifconfig for Linux is part of the package *net-tools*, released as the latest version 2.10 on 7 January 2021.[2]
 
-Many Linux distributions have deprecated the use of ifconfig and route in favor of the software suite [iproute2](https://en.wikipedia.org/wiki/Iproute2), such as ArchLinux\[3\] or RHEL since version 7,\[4\] which has been available since 1999 for Linux 2.2.\[5\] iproute2 includes support for all common functions of ifconfig(8), route(8), arp(8) and netstat(1). It also includes multicast configuration support, tunnel and virtual link management, traffic control, and low-level IPsec configuration, among other features.
+Many Linux distributions have deprecated the use of ifconfig and route in favor of the software suite [iproute2](https://en.wikipedia.org/wiki/Iproute2), such as ArchLinux[3] or RHEL since version 7,[4] which has been available since 1999 for Linux 2.2.[5] iproute2 includes support for all common functions of ifconfig(8), route(8), arp(8) and netstat(1). It also includes multicast configuration support, tunnel and virtual link management, traffic control, and low-level IPsec configuration, among other features.
 
 ## Related tools
 
@@ -83,7 +83,7 @@ In [macOS](https://en.wikipedia.org/wiki/MacOS), the ifconfig command functions 
 
 Other related tools for configuring Ethernet adapters are: [ethtool](https://en.wikipedia.org/wiki/Ethtool), [mii-tool](https://en.wikipedia.org/wiki/Mii-tool), and [mii-diag](https://en.wikipedia.org/wiki/Mii-diag?action=edit&redlink=1) in Linux and the command *[dladm](https://en.wikipedia.org/wiki/Dladm?action=edit&redlink=1) show-link* in Solaris.
 
-The ip suite has a similar purpose and is meant to replace the [deprecated](https://en.wikipedia.org/wiki/Deprecated) ifconfig.\[6\]
+The ip suite has a similar purpose and is meant to replace the [deprecated](https://en.wikipedia.org/wiki/Deprecated) ifconfig.[6]
 
 ## See also
 
