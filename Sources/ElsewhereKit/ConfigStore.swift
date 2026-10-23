@@ -65,10 +65,41 @@ public struct ConfigStore: Sendable {
         let config: ElsewhereConfig
         do {
             config = try JSONDecoder().decode(ElsewhereConfig.self, from: data)
+        } catch let error as DecodingError {
+            // Rendered by case, never localizedDescription — a decoder message could
+            // carry a malformed secret-bearing value verbatim; scrubPatterns regardless.
+            throw .config(
+                "unreadable config at \(url.path): "
+                    + Redactor.scrubPatterns(Self.describe(error)))
         } catch {
-            throw .config("unreadable config at \(url.path): \(error.localizedDescription)")
+            throw .config(
+                "unreadable config at \(url.path): "
+                    + Redactor.scrubPatterns(error.localizedDescription))
         }
         return try Self.validated(config)
+    }
+
+    /// A `DecodingError` rendered by case with its coding path —
+    /// `keyNotFound 'link' at exits.moldova` — so the diagnostic is precise without
+    /// ever forwarding a decoder message raw.
+    static func describe(_ error: DecodingError) -> String {
+        func path(_ context: DecodingError.Context) -> String {
+            context.codingPath.isEmpty
+                ? "root"
+                : context.codingPath.map(\.stringValue).joined(separator: ".")
+        }
+        switch error {
+        case .keyNotFound(let key, let context):
+            return "keyNotFound '\(key.stringValue)' at \(path(context))"
+        case .typeMismatch(_, let context):
+            return "typeMismatch at \(path(context)) — \(context.debugDescription)"
+        case .valueNotFound(_, let context):
+            return "valueNotFound at \(path(context)) — \(context.debugDescription)"
+        case .dataCorrupted(let context):
+            return "dataCorrupted at \(path(context)) — \(context.debugDescription)"
+        @unknown default:
+            return "unreadable"
+        }
     }
 
     /// Writes atomically into a 0700 directory and leaves the file 0600. The directory

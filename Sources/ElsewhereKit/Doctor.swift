@@ -35,12 +35,24 @@ public enum Doctor {
     ) async -> [Check] {
         var checks: [Check] = []
 
+        // Secrets to scrub, populated once the config is read: every link's credentials
+        // plus the raw link, and every secret field inside each resolved outbound — the
+        // engine can echo either in an error. `scrubbed` adds the pattern pass, so even
+        // a failure before the config is loaded (the engine check itself) can't print
+        // anything secret-shaped.
+        var secrets: [String] = []
+        func scrubbed(_ text: String, extraSecrets: [String] = []) -> String {
+            Redactor.scrubPatterns(Redactor.scrub(text, secrets: secrets + extraSecrets))
+        }
+
         // 1. The engine answers. Cold first call ~16 ms (Go runtime init), per the spike.
         do {
             let version = try await XrayCore.shared.version()
             checks.append(Check(name: "engine", verdict: .ok, detail: "Xray-core \(version)"))
         } catch {
-            checks.append(Check(name: "engine", verdict: .failure, detail: error.localizedDescription))
+            checks.append(Check(
+                name: "engine", verdict: .failure,
+                detail: scrubbed(error.localizedDescription)))
         }
 
         // 2. The config: synthesized, present (+ permissions), or missing.
@@ -64,19 +76,15 @@ public enum Doctor {
                 }
             } catch {
                 checks.append(Check(
-                    name: "config", verdict: .failure, detail: error.localizedDescription))
+                    name: "config", verdict: .failure,
+                    detail: scrubbed(error.localizedDescription)))
             }
         }
 
-        // Secrets to scrub: every link's credentials plus the raw link, and every secret
-        // field inside each resolved outbound — the engine can echo either in an error.
-        let secrets: [String] = config?.exits.values.flatMap { exit -> [String] in
+        secrets = config?.exits.values.flatMap { exit -> [String] in
             guard case .link(let link) = exit else { return [] }
             return Redactor.secrets(inLink: link) + [link]
         } ?? []
-        func scrubbed(_ text: String, extraSecrets: [String] = []) -> String {
-            Redactor.scrub(text, secrets: secrets + extraSecrets)
-        }
 
         // 3. Each exit resolves (links/xray through the engine; proxies get a port probe).
         var resolved: [(name: String, outbound: JSONValue)] = []

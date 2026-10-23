@@ -42,9 +42,12 @@ func emit(_ line: String) {
     FileHandle.standardOutput.write(Data((line + "\n").utf8))
 }
 
-/// Writes `elsewhere: <message>` to stderr.
+/// Writes `elsewhere: <message>` to stderr, through the pattern scrub — belt and
+/// braces: callers target-scrub already, but a message is free text and stderr is the
+/// last surface a URL/UUID/long key must never reach raw.
 func printError(_ message: String) {
-    FileHandle.standardError.write(Data("elsewhere: \(message)\n".utf8))
+    let line = "elsewhere: \(Redactor.scrubPatterns(message))\n"
+    FileHandle.standardError.write(Data(line.utf8))
 }
 
 /// Runs `body`, printing an ``ElsewhereError`` to stderr and exiting with its documented

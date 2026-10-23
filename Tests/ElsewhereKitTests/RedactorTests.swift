@@ -84,6 +84,37 @@ struct RedactorTests {
         #expect(!redacted.contains("s3cret"))
     }
 
+    @Test func proxyQueryAndFragmentAreDropped() throws {
+        let url = try #require(
+            URL(string: "http://u:pw@127.0.0.1:10808?password=zzz#frag"))
+        let redacted = Redactor.redact(proxy: url)
+        #expect(redacted == "http://…@127.0.0.1:10808")
+        #expect(!redacted.contains("pw") && !redacted.contains("zzz"))
+    }
+
+    @Test func fragmentCannotRepeatASecret() {
+        let link = Synthetic.link.replacingOccurrences(
+            of: "#Spike%20Exit", with: "#\(Synthetic.uuid)")
+        let redacted = Redactor.redact(link: link)
+        #expect(redacted.contains("#…"))
+        #expect(!redacted.contains(Synthetic.uuid))
+    }
+
+    @Test func scrubPatternsCatchesWhatSecretsCannotEnumerate() {
+        let text = "engine: bad input \(Synthetic.link) / key \(Synthetic.pbk)"
+        let scrubbed = Redactor.scrubPatterns(text)
+        for secret in Synthetic.secrets + [Synthetic.link] {
+            #expect(!scrubbed.contains(secret), "leaked \(secret) in \(scrubbed)")
+        }
+        #expect(scrubbed.contains("…"))
+    }
+
+    @Test func scrubPatternsLeavesOrdinaryText() {
+        let text =
+            "cannot read /tmp/elsewhere-smoke/config.json — first run, id 74682ba3"
+        #expect(Redactor.scrubPatterns(text) == text)
+    }
+
     @Test func summariesPerKind() throws {
         #expect(
             Redactor.summary(of: .link(Synthetic.link))

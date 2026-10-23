@@ -160,6 +160,39 @@ struct ConfigStoreTests {
         #expect(throws: ElsewhereError.self) { _ = try store.load(environment: [:]) }
     }
 
+    @Test func decodeErrorIsRenderedByCaseAndPath() throws {
+        let store = store()
+        try FileManager.default.createDirectory(
+            at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        // `link` must be a string — a number is a typeMismatch at exits.bad.link.
+        try Data(#"{"exits":{"bad":{"link":42}}}"#.utf8).write(to: store.url)
+        do {
+            _ = try store.load(environment: [:])
+            Issue.record("expected a throw")
+        } catch ElsewhereError.config(let message) {
+            #expect(message.contains("typeMismatch"))
+            #expect(message.contains("exits.bad.link"))
+        } catch {
+            Issue.record("expected .config, got \(error)")
+        }
+    }
+
+    @Test func ourOwnDecodeMessageStaysReadable() throws {
+        let store = store()
+        try FileManager.default.createDirectory(
+            at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try Data(#"{"exits":{"bad":{}}}"#.utf8).write(to: store.url)
+        do {
+            _ = try store.load(environment: [:])
+            Issue.record("expected a throw")
+        } catch ElsewhereError.config(let message) {
+            // Exit.init's dataCorrupted text must survive the render verbatim.
+            #expect(message.contains("exit needs exactly one of"))
+        } catch {
+            Issue.record("expected .config, got \(error)")
+        }
+    }
+
     @Test func invalidExitNameInTheFileIsRejected() throws {
         let store = store()
         var bad = config()
