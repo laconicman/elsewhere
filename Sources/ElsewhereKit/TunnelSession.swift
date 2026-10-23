@@ -20,8 +20,13 @@ public actor TunnelSession {
     /// a route of its own (`--direct`), not merely built alongside.
     ///
     /// - Parameters:
+    ///   - config: the loaded config the names resolve against.
+    ///   - exits: the exit names to open routes for.
+    ///   - includeDirect: also open the `direct` lane.
     ///   - bindInterface: applied to every outbound; `.auto` that resolves to no
     ///     physical interface is a start error, never a quiet unbind (A8).
+    ///   - log: the engine log shape (silent, or warnings to a file).
+    ///   - supervisor: the lifecycle owner — injected by tests.
     ///   - interfaceResolver: the test seam (same shape as `Doctor`).
     /// - Throws: `.exit` for an unknown name, `.engine`/`.tunnel` from the supervisor,
     ///   and `.tunnel` when `.auto` finds no physical interface.

@@ -17,15 +17,17 @@ the build to `0.0.0`, so only the major version moves).
 **Discharge:** bump the constant each release (it is one named constant on purpose);
 mechanising it (scraping chromereleases at build time) is worse than the debt.
 
-### TD-2 — `freePorts` are candidates, not reservations — *open*, [#3](https://github.com/laconicman/elsewhere/issues/3)
+### TD-2 — `freePorts` are candidates, not reservations — *discharged*, [#3](https://github.com/laconicman/elsewhere/issues/3)
 
 The inbound ports come from `XrayCore.freePorts`, which checks-now/uses-later: between
 the check and `run` a port can be taken, and a taken port fails `run` mid-start with the
 instance in an unknown state (C5 §5).
 
 **Cost:** a rare, timing-dependent start failure.
-**Discharge:** PR #2's `TunnelSupervisor` policy — defensive `stop`, fresh candidates,
-one retry — pinned by a test once the lifecycle tests exist.
+**Discharge:** discharged by `TunnelSupervisor`'s policy — defensive `stop`, fresh
+candidates, one retry — in `86d4f23` (`FEAT: TunnelSupervisor and TunnelSession`),
+pinned by `aTakenCandidateRetriesWithFreshPorts`: the first draw is deliberately squat
+on and the second draw wins.
 
 ### TD-3 — the engine log has no API hook — *open*, [#4](https://github.com/laconicman/elsewhere/issues/4)
 
