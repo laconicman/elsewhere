@@ -19,6 +19,27 @@ struct LoopbackProbeTests {
         #expect(!(await LoopbackProbe.isListening(port: closedPort(), timeout: .milliseconds(1500))))
     }
 
+    @Test func anIPv6ListenerIsProbed() async throws {
+        // The proxy URL's host is the probe's host — a ::1-only listener must not read
+        // as absent. Machines without a working IPv6 loopback exist: skip then.
+        let server: EchoServer
+        do {
+            server = try EchoServer(host: "::1")
+        } catch {
+            Issue.record("IPv6 loopback unavailable on this machine: \(error) — skipped")
+            return
+        }
+        let port: UInt16
+        do {
+            port = try await server.start()
+        } catch {
+            Issue.record("IPv6 loopback listener failed to start: \(error) — skipped")
+            return
+        }
+        defer { server.stop() }
+        #expect(await LoopbackProbe.isListening(host: "::1", port: port))
+    }
+
     /// A port nothing listens on: bind to 0, read the assigned port, close.
     private func closedPort() -> UInt16 {
         let fd = socket(AF_INET, SOCK_STREAM, 0)

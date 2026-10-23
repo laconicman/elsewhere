@@ -10,9 +10,9 @@ final class EchoServer: Sendable {
 
     private let listener: NWListener
 
-    init() throws {
+    init(host: String = "127.0.0.1") throws {
         let parameters = NWParameters.tcp
-        parameters.requiredLocalEndpoint = .hostPort(host: "127.0.0.1", port: .any)
+        parameters.requiredLocalEndpoint = .hostPort(host: NWEndpoint.Host(host), port: .any)
         listener = try NWListener(using: parameters)
     }
 

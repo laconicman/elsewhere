@@ -167,15 +167,22 @@ public enum Redactor {
             if case .object(let settings)? = object["settings"],
                 case .string(let address)? = settings["address"]
             {
-                var endpoint = address
-                if case .number(let port)? = settings["port"] {
-                    endpoint += ":\(Int(port))"
-                }
-                return "xray \(proto) → \(endpoint)"
+                return "xray \(proto) → \(endpoint(address, port: settings["port"]))"
             }
             return "xray \(proto)"
         case .proxy(let url):
             return "proxy \(redact(proxy: url))"
         }
+    }
+
+    /// `address:port` for a port read from a `JSONValue` — `Int(exactly:)` plus the
+    /// uint16 range, because the number is a `Double` and `Int(_:)` traps on values
+    /// outside `Int`'s range or with a fraction; a hand-edited exit must crash nothing.
+    static func endpoint(_ address: String, port: JSONValue?) -> String {
+        guard case .number(let number) = port else { return address }
+        guard let port = Int(exactly: number), (0...65535).contains(port) else {
+            return "\(address):<invalid port>"
+        }
+        return "\(address):\(port)"
     }
 }

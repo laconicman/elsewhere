@@ -128,6 +128,22 @@ struct RedactorTests {
                 == "proxy http://127.0.0.1:10808")
     }
 
+    @Test func outOfRangePortsRenderSafely() throws {
+        // JSONValue numbers are Double; Int() would trap on these — a hand-edited exit
+        // must crash nothing.
+        let huge = try Self.json("""
+            {"protocol":"vless","settings":{"address":"example.org","port":100000000000000000000}}
+            """)
+        #expect(
+            Redactor.summary(of: .xray(huge)) == "xray vless → example.org:<invalid port>")
+        let fractional = try Self.json("""
+            {"protocol":"vless","settings":{"address":"example.org","port":8443.5}}
+            """)
+        #expect(
+            Redactor.summary(of: .xray(fractional))
+                == "xray vless → example.org:<invalid port>")
+    }
+
     @Test func scrubReplacesEverySecret() {
         let text = "bad link \(Synthetic.link) — uuid \(Synthetic.uuid)"
         let scrubbed = Redactor.scrub(text, secrets: Redactor.secrets(inLink: Synthetic.link) + [Synthetic.link])

@@ -109,7 +109,7 @@ public enum Doctor {
                 let host = url.host(percentEncoded: false)
                 if let host, isLoopback(host) {
                     if let port = url.port, let port16 = UInt16(exactly: port), port16 > 0 {
-                        if await LoopbackProbe.isListening(port: port16) {
+                        if await LoopbackProbe.isListening(host: host, port: port16) {
                             checks.append(Check(
                                 name: "exit \(name)", verdict: .ok,
                                 detail: "\(summary) — listening"))
@@ -257,7 +257,7 @@ public enum Doctor {
         }
         guard case .object(let settings)? = object["settings"] else { return route }
         if case .string(let address)? = settings["address"] {
-            return "\(route) → \(endpoint(address, settings["port"]))"
+            return "\(route) → \(Redactor.endpoint(address, port: settings["port"]))"
         }
         // Classic shape: settings.vnext[0] or settings.servers[0].
         for key in ["vnext", "servers"] {
@@ -265,15 +265,10 @@ public enum Doctor {
                 case .object(let first)? = list.first,
                 case .string(let address)? = first["address"]
             {
-                return "\(route) → \(endpoint(address, first["port"]))"
+                return "\(route) → \(Redactor.endpoint(address, port: first["port"]))"
             }
         }
         return route
-    }
-
-    static func endpoint(_ address: String, _ port: JSONValue?) -> String {
-        guard case .number(let port) = port else { return address }
-        return "\(address):\(Int(port))"
     }
 
     /// The hosts a `proxy` exit gets probed on: literals only — `localhost` resolves, so

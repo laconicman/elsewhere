@@ -11,9 +11,19 @@ public enum LoopbackProbe {
     /// whichever of the verdict and the timeout lands first wins, the connection is
     /// cancelled either way, and a cancelled caller cancels the connect instead of
     /// waiting out the timeout.
-    public static func isListening(port: UInt16, timeout: Duration = .seconds(1)) async -> Bool {
+    /// - Parameters:
+    ///   - host: the loopback literal to probe — `doctor` passes a proxy exit's
+    ///     configured host (`::1` works through `NWEndpoint.Host`); the INCY check
+    ///     keeps the IPv4 default.
+    ///   - port: the TCP port.
+    ///   - timeout: how long to wait for a verdict before answering false.
+    public static func isListening(
+        host: String = "127.0.0.1",
+        port: UInt16,
+        timeout: Duration = .seconds(1)
+    ) async -> Bool {
         guard let endpoint = NWEndpoint.Port(rawValue: port) else { return false }
-        let connection = NWConnection(host: "127.0.0.1", port: endpoint, using: .tcp)
+        let connection = NWConnection(host: NWEndpoint.Host(host), port: endpoint, using: .tcp)
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 let resumed = Mutex(false)
