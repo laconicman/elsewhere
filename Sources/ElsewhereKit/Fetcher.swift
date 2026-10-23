@@ -134,14 +134,23 @@ enum ProxySessionFactory {
             let target = NWEndpoint.hostPort(host: .init(host), port: endpoint)
             let configuration: ProxyConfiguration
             switch url.scheme?.lowercased() {
-            case "socks5", "socks5h":
-                configuration = ProxyConfiguration(socksv5Proxy: target)
+            case "http":
+                configuration = ProxyConfiguration(httpCONNECTProxy: target)
             case "https":
                 // TLS to the proxy itself, then CONNECT inside it.
                 configuration = ProxyConfiguration(
                     httpCONNECTProxy: target, tlsOptions: NWProtocolTLS.Options())
-            default:
-                configuration = ProxyConfiguration(httpCONNECTProxy: target)
+            case "socks5", "socks5h":
+                configuration = ProxyConfiguration(socksv5Proxy: target)
+            case .some(let scheme):
+                // An unknown scheme must not silently become a CONNECT proxy.
+                throw .exit(
+                    "proxy exit '\(exit)' has scheme '\(scheme)'; "
+                        + "http, https, socks5 and socks5h are supported")
+            case .none:
+                throw .exit(
+                    "proxy exit '\(exit)' has no scheme; "
+                        + "http, https, socks5 and socks5h are supported")
             }
             if let user = url.user, !user.isEmpty {
                 configuration.applyCredential(username: user, password: url.password ?? "")
