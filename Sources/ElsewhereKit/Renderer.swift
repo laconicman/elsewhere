@@ -543,10 +543,12 @@ extension Renderer {
         }
         let title = caption.isEmpty ? [] : [markdown ? "**\(caption)**" : caption]
         if !markdown {
-            // Plain text has no pipes: one line per row, two spaces between cells.
+            // Plain text has no pipes: one line per row, two spaces between
+            // cells. An all-empty padded row joins to whitespace, not "" —
+            // test the cells, not the join.
             let lines = grid.compactMap { row -> String? in
-                let line = row.joined(separator: "  ")
-                return line.isEmpty ? nil : line
+                guard row.contains(where: { !$0.isEmpty }) else { return nil }
+                return row.joined(separator: "  ")
             }
             return title + (lines.isEmpty ? [] : [lines.joined(separator: "\n")])
         }

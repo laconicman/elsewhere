@@ -468,6 +468,17 @@ struct RendererTests {
         #expect(rendered.contains("| h1 | h2 |\n|---|---|\n| a | b |"))
     }
 
+    /// An all-empty `<tr>` pads to whitespace-only cells; text mode drops it
+    /// like the Markdown branch does — two real rows yield two lines.
+    @Test func textModeTablesSkipEmptyRows() {
+        let rendered = Renderer.render(
+            "<body><table><tr><td>a</td></tr><tr></tr>"
+                + "<tr><td>b</td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .text)
+        #expect(rendered.hasPrefix("a\nb\n"))
+    }
+
     @Test func fenceLanguageComesFromPreOrCodeClasses() {
         let url = URL(string: "https://example.com")!
         let preCode = Renderer.render(
