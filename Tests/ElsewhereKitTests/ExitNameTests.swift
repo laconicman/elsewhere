@@ -27,4 +27,17 @@ struct ExitNameTests {
             #expect(error.errorDescription?.contains("env") == true)
         }
     }
+
+    @Test func errorsNeverEchoTheArgument() {
+        // A link pasted as the positional must not come back in the message — stderr
+        // is the last surface a secret can reach.
+        do {
+            try ExitName.validate("vless://x@y")
+            Issue.record("expected a throw")
+        } catch ElsewhereError.exit(let message) {
+            #expect(!message.contains("vless"))
+        } catch {
+            Issue.record("expected .exit, got \(error)")
+        }
+    }
 }

@@ -22,6 +22,37 @@ struct ElsewhereCommand: AsyncParsableCommand {
         version: Elsewhere.version,
         subcommands: [ExitsCommand.self, DoctorCommand.self]
     )
+
+    /// `parseAsRoot` + run, hand-rolled for one reason: ArgumentParser's own parse
+    /// errors (`Unexpected argument 'vless://…'`) print verbatim to stderr, never
+    /// touching `Redactor` — and a link pasted as a stray positional is exactly that
+    /// shape. Everything AP would print to stderr goes through `scrubPatterns` first.
+    /// Our own `ExitCode`s were already reported by `printError` — they exit silently;
+    /// `CleanExit` (--help/--version, which AP wraps in `CommandError`) keeps AP's
+    /// stdout behaviour.
+    static func main() async {
+        do {
+            var command = try parseAsRoot()
+            if var asyncCommand = command as? any AsyncParsableCommand {
+                try await asyncCommand.run()
+            } else {
+                try command.run()
+            }
+        } catch let code as ExitCode {
+            Foundation.exit(code.rawValue)
+        } catch {
+            // AP wraps parser outcomes in (internal) CommandError, so the public
+            // discriminator is the exit code: .success means help/version/completions
+            // — hand those back to AP's renderer (stdout). Everything else is scrubbed
+            // to stderr; a stray `vless://…` positional ends up here.
+            if Self.exitCode(for: error) == .success {
+                Self.exit(withError: error)
+            }
+            let line = "elsewhere: \(Redactor.scrubPatterns(Self.fullMessage(for: error)))\n"
+            FileHandle.standardError.write(Data(line.utf8))
+            Foundation.exit(Self.exitCode(for: error).rawValue)
+        }
+    }
 }
 
 /// Every subcommand's `--config PATH`, resolved once the same way (§5.2 precedence).
