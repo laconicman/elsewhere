@@ -47,6 +47,9 @@ public enum LoopbackProbe {
                     default: break // .preparing/.waiting — wait for a verdict or the timeout
                     }
                 }
+                // Already-correct via onCancel → cancel() → .cancelled → false; this
+                // just shortens the path (same shape as InterfaceResolver).
+                if Task.isCancelled { finish(false); return }
                 connection.start(queue: .global())
                 Task {
                     try? await Task.sleep(for: timeout)

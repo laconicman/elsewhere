@@ -46,6 +46,10 @@ public enum InterfaceResolver {
                         [.wifi, .wiredEthernet, .cellular].contains($0.type)
                     }?.name)
                 }
+                // Cancellation can land before the box was filled — onCancel then saw
+                // nil and missed us. Check once before the monitor starts; the one-shot
+                // guard makes any later onCancel/handler call a no-op.
+                if Task.isCancelled { finish(nil); return }
                 monitor.start(queue: .global())
                 Task {
                     try? await Task.sleep(for: timeout)
