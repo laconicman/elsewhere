@@ -205,6 +205,37 @@ struct RendererTests {
         #expect(rendered.contains("text\n\npara\n\ntail *e*"))
     }
 
+    /// A whitespace-only inline element is the space between its siblings — the
+    /// golden's `August1983` merge.
+    @Test func elementEdgesKeepTheirWhitespace() {
+        let rendered = Renderer.render(
+            "<body><p>August<span>&nbsp;</span>1983</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("August 1983"))
+    }
+
+    /// Boundary spaces inside a mixed element survive — the golden's
+    /// `net-tools)on(` merge.
+    @Test func boundarySpacesInsideElementsSurvive() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"/a\">net-tools</a><span> on </span>"
+                + "<a href=\"/b\">SourceForge</a></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains(") on ["))
+    }
+
+    /// Block-level children met in inline context still separate — a cell's two
+    /// paragraphs are "alpha beta", not "alphabeta".
+    @Test func blockChildrenInsideACellSeparate() {
+        let rendered = Renderer.render(
+            "<body><table><tr><td><p>alpha</p><p>beta</p></td></tr></table></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("alpha beta"))
+    }
+
     /// The `Source:` footer follows the `--json` rule — a credentialled URL's
     /// userinfo never reaches stdout.
     @Test func theSourceFooterDropsUserinfo() {

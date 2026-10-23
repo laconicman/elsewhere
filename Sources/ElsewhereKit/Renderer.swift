@@ -166,18 +166,19 @@ extension Renderer {
         switch element.tagName().lowercased() {
         case "h1", "h2", "h3", "h4", "h5", "h6":
             let level = Int(element.tagName().dropFirst()) ?? 1
-            let text = inline(element, markdown: markdown, depth: depth)
+            let text = trimBlock(inline(element, markdown: markdown, depth: depth))
             guard !text.isEmpty else { return [] }
             return [markdown ? String(repeating: "#", count: level) + " " + text : text]
         case "p", "figcaption", "address", "caption", "dt", "dd", "summary", "legend":
-            let text = escapeBlockStart(inline(element, markdown: markdown, depth: depth),
-                                        markdown: markdown)
+            let text = escapeBlockStart(
+                trimBlock(inline(element, markdown: markdown, depth: depth)),
+                markdown: markdown)
             return text.isEmpty ? [] : [text]
         case "ul", "ol":
             return listItems(element, ordered: element.tagName() == "ol",
                              depth: 0, markdown: markdown)
         case "li":
-            return ["- " + inline(element, markdown: markdown, depth: depth)]
+            return ["- " + trimBlock(inline(element, markdown: markdown, depth: depth))]
         case "blockquote":
             let inner = blocks(of: element, markdown: markdown, depth: depth)
             // `> ` is a Markdown delimiter — plain text keeps the paragraphs bare.
@@ -204,8 +205,9 @@ extension Renderer {
             // a paragraph.
             let children = blocks(of: element, markdown: markdown, depth: depth)
             if !children.isEmpty { return children }
-            let text = escapeBlockStart(inline(element, markdown: markdown, depth: depth),
-                                        markdown: markdown)
+            let text = escapeBlockStart(
+                trimBlock(inline(element, markdown: markdown, depth: depth)),
+                markdown: markdown)
             return text.isEmpty ? [] : [text]
         }
     }
@@ -376,7 +378,7 @@ extension Renderer {
         guard let rows = try? table.select("tr"), rows.count > 0 else { return [] }
         func cells(_ row: Element) -> [String] {
             (try? row.select("th, td"))?.map { cell in
-                inline(cell, markdown: markdown, depth: depth + 2)
+                trimBlock(inline(cell, markdown: markdown, depth: depth + 2))
                     .replacingOccurrences(of: "\n", with: " ")
             } ?? []
         }
@@ -417,7 +419,8 @@ extension Renderer {
         switch element.tagName().lowercased() {
         case "br": return "\n"
         case "code":
-            let content = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(
+                inlineChildren(element, markdown: markdown, depth: depth))
             if content.isEmpty { return "" }
             guard markdown else { return content }
             // The delimiter must outlive the longest backtick run inside;
@@ -427,7 +430,8 @@ extension Renderer {
             let padded = content.hasPrefix("`") || content.hasSuffix("`")
             return fence + (padded ? " " : "") + content + (padded ? " " : "") + fence
         case "a":
-            let content = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(
+                inlineChildren(element, markdown: markdown, depth: depth))
             guard markdown else { return content }
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -448,21 +452,31 @@ extension Renderer {
             else { return alt }
             return "![\(alt)](\(absolute))"
         case "strong", "b":
-            let content = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(
+                inlineChildren(element, markdown: markdown, depth: depth))
             return markdown && !content.isEmpty ? "**\(content)**" : content
         case "em", "i":
-            let content = inlineChildren(element, markdown: markdown, depth: depth)
+            let content = trimBlock(
+                inlineChildren(element, markdown: markdown, depth: depth))
             return markdown && !content.isEmpty ? "*\(content)*" : content
         default:
             return inlineChildren(element, markdown: markdown, depth: depth)
         }
     }
 
+    /// Collapse, never trim — a `<span> </span>` between words IS their space;
+    /// trimming happens at the block level. A block-level child met in inline
+    /// context still separates: `<td><p>alpha</p><p>beta</p></td>` is
+    /// "alpha beta", not "alphabeta".
     private static func inlineChildren(
         _ element: Element, markdown: Bool, depth: Int
     ) -> String {
-        trimBlock(element.getChildNodes()
-            .map { inline($0, markdown: markdown, depth: depth + 1) }.joined())
+        collapseLines(element.getChildNodes().map { node in
+            if let child = node as? Element, isBlock(child, depth: depth + 1) {
+                return " " + inline(child, markdown: markdown, depth: depth + 1) + " "
+            }
+            return inline(node, markdown: markdown, depth: depth + 1)
+        }.joined())
     }
 
     /// One text node's whitespace runs → one space — boundary spaces survive so

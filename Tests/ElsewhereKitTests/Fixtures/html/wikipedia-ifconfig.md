@@ -6,8 +6,8 @@ Not to be confused with [ipconfig](https://en.wikipedia.org/wiki/Ipconfig).
 
 | ifconfig |
 |---|
-| [![](https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Ifconfig_example_screenshot.png/250px-Ifconfig_example_screenshot.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail)](https://en.wikipedia.org/wiki/File:Ifconfig_example_screenshot.png)Screenshot of ifconfig output in Linux |
-| Release | August1983;43years ago(1983-08) |
+| [![](https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c9/Ifconfig_example_screenshot.png/250px-Ifconfig_example_screenshot.png?utm_source=en.wikipedia.org&utm_campaign=parser&utm_content=thumbnail)](https://en.wikipedia.org/wiki/File:Ifconfig_example_screenshot.png) Screenshot of ifconfig output in Linux |
+| Release | August 1983; 43 years ago (1983-08) |
 | [Operating system](https://en.wikipedia.org/wiki/Operating_system) | [Unix](https://en.wikipedia.org/wiki/Unix) and [Unix-like](https://en.wikipedia.org/wiki/Unix-like) |
 | [Type](https://en.wikipedia.org/wiki/Software_categories#Categorization_approaches) | [Command](https://en.wikipedia.org/wiki/Command_(computing)) |
 
@@ -100,7 +100,7 @@ The ip suite has a similar purpose and is meant to replace the [deprecated](http
 [[edit](https://en.wikipedia.org/w/index.php?title=Ifconfig&action=edit&section=6)]
 
 1. ↑ "Interface Configuration for IP". [*Linux Network Administrators Guide*](https://www.oreilly.com/openbook/linag2/book/ch05.html). June 2000. Retrieved 12 March 2024.
-2. ↑ [net-tools](https://sourceforge.net/projects/net-tools/)on[SourceForge](https://en.wikipedia.org/wiki/SourceForge)
+2. ↑ [net-tools](https://sourceforge.net/projects/net-tools/) on [SourceForge](https://en.wikipedia.org/wiki/SourceForge)
 3. ↑ Gundersen, Tom (8 June 2011). ["News: Deprecation of net-tools"](https://www.archlinux.org/news/deprecation-of-net-tools/). Retrieved 28 March 2019.
 4. ↑ Jonathan Corbet (4 January 2017). ["Moving on from net-tools"](https://lwn.net/Articles/710533/). [LWN.net](https://en.wikipedia.org/wiki/LWN.net). Retrieved 23 September 2019.
 5. ↑ Litvak, Michail (6 March 2019). ["ip(8) manual page"](http://man7.org/linux/man-pages/man8/ip.8.html#HISTORY). Retrieved 28 March 2019.
@@ -114,7 +114,7 @@ The ip suite has a similar purpose and is meant to replace the [deprecated](http
 - [ifconfig(8)](https://www.freebsd.org/cgi/man.cgi?query=ifconfig), manpage for the [FreeBSD](https://en.wikipedia.org/wiki/FreeBSD) ifconfig
 - [ifconfig(8)](https://docs.oracle.com/cd/E19253-01/816-5166/ifconfig-1m/index.html), manpage for the [Solaris](https://en.wikipedia.org/wiki/Solaris_(operating_system)) ifconfig
 
-| [v](https://en.wikipedia.org/wiki/Template:Unix_commands)[t](https://en.wikipedia.org/wiki/Template_talk:Unix_commands)[e](https://en.wikipedia.org/wiki/Special:EditPage/Template:Unix_commands)[Unix](https://en.wikipedia.org/wiki/Unix) [command-line](https://en.wikipedia.org/wiki/Command-line_interface) [utilities](https://en.wikipedia.org/wiki/Utility_software) and [shell builtins](https://en.wikipedia.org/wiki/Shell_builtin) |
+| [v](https://en.wikipedia.org/wiki/Template:Unix_commands) [t](https://en.wikipedia.org/wiki/Template_talk:Unix_commands) [e](https://en.wikipedia.org/wiki/Special:EditPage/Template:Unix_commands) [Unix](https://en.wikipedia.org/wiki/Unix) [command-line](https://en.wikipedia.org/wiki/Command-line_interface) [utilities](https://en.wikipedia.org/wiki/Utility_software) and [shell builtins](https://en.wikipedia.org/wiki/Shell_builtin) |
 |---|
 | File system | [cat](https://en.wikipedia.org/wiki/Cat_(Unix)) [chattr](https://en.wikipedia.org/wiki/Chattr) [chmod](https://en.wikipedia.org/wiki/Chmod) [chown](https://en.wikipedia.org/wiki/Chown) [chgrp](https://en.wikipedia.org/wiki/Chgrp) [cksum](https://en.wikipedia.org/wiki/Cksum) [cmp](https://en.wikipedia.org/wiki/Cmp_(Unix)) [cp](https://en.wikipedia.org/wiki/Cp_(Unix)) [dd](https://en.wikipedia.org/wiki/Dd_(Unix)) [du](https://en.wikipedia.org/wiki/Du_(Unix)) [df](https://en.wikipedia.org/wiki/Df_(Unix)) [file](https://en.wikipedia.org/wiki/File_(command)) [fuser](https://en.wikipedia.org/wiki/Fuser_(Unix)) [ln](https://en.wikipedia.org/wiki/Ln_(Unix)) [ls](https://en.wikipedia.org/wiki/Ls) [mkdir](https://en.wikipedia.org/wiki/Mkdir) [mv](https://en.wikipedia.org/wiki/Mv_(Unix)) [pax](https://en.wikipedia.org/wiki/Pax_(command)) [pwd](https://en.wikipedia.org/wiki/Pwd) [rm](https://en.wikipedia.org/wiki/Rm_(Unix)) [rmdir](https://en.wikipedia.org/wiki/Rmdir) [split](https://en.wikipedia.org/wiki/Split_(Unix)) [tee](https://en.wikipedia.org/wiki/Tee_(command)) [touch](https://en.wikipedia.org/wiki/Touch_(command)) [type](https://en.wikipedia.org/wiki/Type_(Unix)) [umask](https://en.wikipedia.org/wiki/Umask) |
 | Processes | [at](https://en.wikipedia.org/wiki/At_(command)) [bg](https://en.wikipedia.org/wiki/Job_control_(Unix)#Commands) [crontab](https://en.wikipedia.org/wiki/Cron) [fg](https://en.wikipedia.org/wiki/Job_control_(Unix)#Commands) [kill](https://en.wikipedia.org/wiki/Kill_(command)) [nice](https://en.wikipedia.org/wiki/Nice_(Unix)) [ps](https://en.wikipedia.org/wiki/Ps_(Unix)) [time](https://en.wikipedia.org/wiki/Time_(Unix)) |
