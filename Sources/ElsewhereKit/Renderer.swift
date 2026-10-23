@@ -11,11 +11,14 @@ import SwiftSoup // the parser — never in the public surface (rule 1)
 ///     Source: <finalURL>
 ///
 /// Non-HTML text — `text/plain`, JSON, a `cdn-cgi/trace` body — passes through
-/// untouched for every format: no title line, no footer, byte-exact.
+/// unchanged for every format: no title line, no footer (only `raw` is
+/// wire-exact — anything else went through `TextDecoder`).
 ///
 /// Escaping stays minimal on purpose: agents read raw Markdown, and over-escaping
 /// hurts readability more than the occasional literal `#` helps a stray renderer —
-/// only a text node that would otherwise open a block, and `|` in table cells.
+/// only a line that would otherwise open a block (heading, bullet, quote,
+/// numbered marker, fence, rule, HTML opener or link reference definition),
+/// `|` in table cells, and `[`/`]` inside a link label get a backslash.
 public enum Renderer {
     /// Under this rendered body length a shell's markup is a symptom, not content.
     static let jsShellThreshold = 200

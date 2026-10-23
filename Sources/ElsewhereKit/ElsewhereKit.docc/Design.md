@@ -157,12 +157,12 @@ of Swift HTML→Markdown libraries is tiny — the plan's survey (§3.7) found e
 candidate at ≤ 18★ and unmaintained — so the renderer is a hand-written walk
 over **SwiftSoup**, the long-lived jsoup port already trusted for parsing, and
 the block/inline rules are ours to tune (TD-6). The reader is a language model,
-which
-shapes two decisions. **Escaping is minimal:** only a text node that would open a
-block (`#`, `- `, `> `, `1. ` at line start), `|` in table cells, and `[`/`]`
-inside a link label get a
-backslash — over-escaping hurts an agent's readability more than the rare literal
-marker it prevents. **The JavaScript-shell note is honest:** when a page carried
+which shapes two decisions. **Escaping is minimal:** only a line that would
+open a block — heading, bullet, quote, numbered marker, fence, rule, HTML
+opener or link reference definition — `|` in table cells, and `[`/`]` inside a
+link label get a backslash; an inline element's edge whitespace moves outside
+its delimiters. Over-escaping hurts an agent's readability more than the rare
+literal marker it prevents. **The JavaScript-shell note is honest:** when a page carried
 `script[src]`s but renders under 200 characters, `fetch` appends
 `_Note: this page appears to be rendered by JavaScript; the HTML shell carried
 little content._` — a shell pretending to be content is worse than a named limit.
