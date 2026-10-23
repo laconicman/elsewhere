@@ -42,6 +42,11 @@ public enum Renderer {
     /// Images only ride http(s) — any other scheme renders as the alt text.
     static let imageSchemes: Set<String> = ["http", "https"]
 
+    /// DOM nesting the renderer follows. SwiftSoup parses arbitrarily deep
+    /// trees (a hostile page can nest to stack-overflow depth); past this the
+    /// subtree renders as its collapsed text — iterative, no recursion.
+    static let maxDepth = 64
+
     /// - Parameters:
     ///   - text: the decoded body (`TextDecoder` decides text vs binary earlier).
     ///   - contentType: the response's Content-Type, if any.
@@ -71,7 +76,7 @@ public enum Renderer {
             ?? document.body() ?? document
 
         let markdown = format == .markdown
-        let blocks = blocks(of: root, markdown: markdown)
+        let blocks = blocks(of: root, markdown: markdown, depth: 0)
         var body = blocks.joined(separator: "\n\n")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         if hadExternalScripts, body.count < jsShellThreshold {
@@ -118,12 +123,14 @@ extension Renderer {
     /// True when `element` opens a block — its tag is listed, or it carries a
     /// block-level descendant: an unlisted element *wrapping* block children is a
     /// container, not inline text (GitHub's `<markdown-accessiblity-table>` wraps a
-    /// `table`; flattening it into a paragraph would lose the table).
-    private static func isBlock(_ element: Element) -> Bool {
+    /// `table`; flattening it into a paragraph would lose the table). Past
+    /// `maxDepth` everything is inline — the subtree becomes collapsed text.
+    private static func isBlock(_ element: Element, depth: Int) -> Bool {
+        guard depth < maxDepth else { return false }
         if blockTags.contains(element.tagName().lowercased()) { return true }
         return element.getChildNodes().contains { node in
             guard let child = node as? Element else { return false }
-            return isBlock(child)
+            return isBlock(child, depth: depth + 1)
         }
     }
 
@@ -131,20 +138,21 @@ extension Renderer {
     /// run of inline nodes renders as ONE paragraph — `<div>See <a>here</a> now</div>`
     /// is "See [here](…) now", not three blocks. (Before this grouping an inline
     /// element took `block()`'s default path and lost its link/emphasis entirely.)
-    private static func blocks(of element: Element, markdown: Bool) -> [String] {
+    private static func blocks(of element: Element, markdown: Bool, depth: Int) -> [String] {
         var blocks: [String] = []
         var run: [Node] = []
         func flushRun() {
             let text = escapeBlockStart(
-                trimBlock(run.map { inline($0, markdown: markdown) }.joined()),
+                trimBlock(run.map { inline($0, markdown: markdown, depth: depth + 1) }
+                    .joined()),
                 markdown: markdown)
             if !text.isEmpty { blocks.append(text) }
             run = []
         }
         for node in element.getChildNodes() {
-            if let child = node as? Element, isBlock(child) {
+            if let child = node as? Element, isBlock(child, depth: depth + 1) {
                 flushRun()
-                blocks += block(child, markdown: markdown)
+                blocks += block(child, markdown: markdown, depth: depth + 1)
             } else {
                 run.append(node)
             }
@@ -154,24 +162,24 @@ extension Renderer {
     }
 
     /// One element as blocks — the element-name switch is the whole contract.
-    private static func block(_ element: Element, markdown: Bool) -> [String] {
+    private static func block(_ element: Element, markdown: Bool, depth: Int) -> [String] {
         switch element.tagName().lowercased() {
         case "h1", "h2", "h3", "h4", "h5", "h6":
             let level = Int(element.tagName().dropFirst()) ?? 1
-            let text = inline(element, markdown: markdown)
+            let text = inline(element, markdown: markdown, depth: depth)
             guard !text.isEmpty else { return [] }
             return [markdown ? String(repeating: "#", count: level) + " " + text : text]
         case "p", "figcaption", "address", "caption", "dt", "dd", "summary", "legend":
-            let text = escapeBlockStart(inline(element, markdown: markdown),
+            let text = escapeBlockStart(inline(element, markdown: markdown, depth: depth),
                                         markdown: markdown)
             return text.isEmpty ? [] : [text]
         case "ul", "ol":
             return listItems(element, ordered: element.tagName() == "ol",
                              depth: 0, markdown: markdown)
         case "li":
-            return ["- " + inline(element, markdown: markdown)]
+            return ["- " + inline(element, markdown: markdown, depth: depth)]
         case "blockquote":
-            let inner = blocks(of: element, markdown: markdown)
+            let inner = blocks(of: element, markdown: markdown, depth: depth)
             // `> ` is a Markdown delimiter — plain text keeps the paragraphs bare.
             guard markdown else { return inner }
             let joined = inner.joined(separator: "\n\n")
@@ -179,24 +187,24 @@ extension Renderer {
             return [joined.split(separator: "\n", omittingEmptySubsequences: false)
                 .map { $0.isEmpty ? ">" : "> \($0)" }.joined(separator: "\n")]
         case "pre":
-            return [preBlock(element, markdown: markdown)]
+            return [preBlock(element, markdown: markdown, depth: depth)]
         case "table":
-            return table(element, markdown: markdown)
+            return table(element, markdown: markdown, depth: depth)
         case "hr":
             // `---` is a Markdown delimiter — a rule just separates two blocks.
             return markdown ? ["---"] : []
         case "br":
             return []
         case "img":
-            let text = inline(element, markdown: markdown)
+            let text = inline(element, markdown: markdown, depth: depth)
             return text.isEmpty ? [] : [text]
         default:
             // A container (div, section, main, article, figure, details, dl, …) or an
             // unknown element: blocks inside become their own blocks, inline content
             // a paragraph.
-            let children = blocks(of: element, markdown: markdown)
+            let children = blocks(of: element, markdown: markdown, depth: depth)
             if !children.isEmpty { return children }
-            let text = escapeBlockStart(inline(element, markdown: markdown),
+            let text = escapeBlockStart(inline(element, markdown: markdown, depth: depth),
                                         markdown: markdown)
             return text.isEmpty ? [] : [text]
         }
@@ -237,13 +245,18 @@ extension Renderer {
                         segments.append(.text(buffer))
                         buffer = ""
                     }
-                    segments.append(.list(listItems(
-                        element, ordered: element.tagName() == "ol",
-                        depth: depth + 1, markdown: markdown)))
+                    if depth + 1 < maxDepth {
+                        segments.append(.list(listItems(
+                            element, ordered: element.tagName() == "ol",
+                            depth: depth + 1, markdown: markdown)))
+                    } else { // past the cap a nested list is collapsed text
+                        buffer += inline(element, markdown: markdown,
+                                         depth: depth + 1)
+                    }
                 } else if let text = node as? TextNode {
                     buffer += collapse(text.text())
                 } else if let element = node as? Element {
-                    buffer += inline(element, markdown: markdown)
+                    buffer += inline(element, markdown: markdown, depth: depth + 2)
                 }
             }
             if !buffer.isEmpty { segments.append(.text(buffer)) }
@@ -280,7 +293,7 @@ extension Renderer {
     /// Fenced code: ` ```language `, content verbatim, ` ``` `. The language comes
     /// from `language-*`/`lang-*` on the `pre` or a `code` child; `text` format
     /// drops the fences, keeping the code as a plain block.
-    private static func preBlock(_ pre: Element, markdown: Bool) -> String {
+    private static func preBlock(_ pre: Element, markdown: Bool, depth: Int) -> String {
         var language = ""
         for candidate in [pre] + (pre.children().filter { $0.tagName() == "code" }) {
             if language.isEmpty, let names = try? candidate.classNames() {
@@ -293,7 +306,8 @@ extension Renderer {
                     } ?? ""
             }
         }
-        let code = wholeText(pre).trimmingCharacters(in: CharacterSet(charactersIn: "\n"))
+        let code = wholeText(pre, depth: depth + 1)
+            .trimmingCharacters(in: CharacterSet(charactersIn: "\n"))
         // The fence must outlive the longest backtick run inside the code
         // (CommonMark 4.5 — a triple inside a triple would end the block early).
         let fence = String(repeating: "`", count: max(3, longestBacktickRun(code) + 1))
@@ -322,22 +336,47 @@ extension Renderer {
     }
 
     /// Every descendant text node verbatim — `pre` content keeps its whitespace.
-    private static func wholeText(_ element: Element) -> String {
-        element.getChildNodes().map { node in
+    private static func wholeText(_ element: Element, depth: Int) -> String {
+        guard depth < maxDepth else { return subtreeText(element, whole: true) }
+        return element.getChildNodes().map { node in
             if let text = node as? TextNode { return text.getWholeText() }
-            if let child = node as? Element { return wholeText(child) }
+            if let child = node as? Element {
+                return wholeText(child, depth: depth + 1)
+            }
             return ""
         }.joined()
+    }
+
+    /// A subtree's text gathered iteratively — the `maxDepth` escape hatch: no
+    /// recursion, content still surfaces. `whole` keeps whitespace verbatim
+    /// (`pre`); otherwise whitespace collapses and `br` stays a newline, as in
+    /// `inline`.
+    private static func subtreeText(_ element: Element, whole: Bool) -> String {
+        var parts: [String] = []
+        var stack: [Node] = element.getChildNodes().reversed()
+        while let node = stack.popLast() {
+            if let text = node as? TextNode {
+                parts.append(whole ? text.getWholeText() : text.text())
+            } else if let child = node as? Element {
+                if child.tagName().lowercased() == "br" {
+                    parts.append("\n")
+                    continue
+                }
+                stack.append(contentsOf: child.getChildNodes().reversed())
+            }
+        }
+        let joined = parts.joined()
+        return whole ? joined : collapseLines(joined)
     }
 
     /// GFM table: the first `tr` carrying a `th` is the header — else the first row —
     /// then a `|---|` separator and the body rows. Cells flatten inline, `|` is
     /// escaped, newlines collapse to a space.
-    private static func table(_ table: Element, markdown: Bool) -> [String] {
+    private static func table(_ table: Element, markdown: Bool, depth: Int) -> [String] {
         guard let rows = try? table.select("tr"), rows.count > 0 else { return [] }
         func cells(_ row: Element) -> [String] {
             (try? row.select("th, td"))?.map { cell in
-                inline(cell, markdown: markdown)
+                inline(cell, markdown: markdown, depth: depth + 2)
                     .replacingOccurrences(of: "\n", with: " ")
             } ?? []
         }
@@ -370,14 +409,15 @@ extension Renderer {
 
     /// Everything inside one element as inline Markdown. Text nodes collapse —
     /// never trim — so a sibling keeps its boundary spaces; the edges trim at the
-    /// block level.
-    private static func inline(_ node: Node, markdown: Bool) -> String {
+    /// block level. Past `maxDepth` the subtree is its collapsed text.
+    private static func inline(_ node: Node, markdown: Bool, depth: Int) -> String {
         if let text = node as? TextNode { return collapse(text.text()) }
         guard let element = node as? Element else { return "" }
+        guard depth < maxDepth else { return subtreeText(element, whole: false) }
         switch element.tagName().lowercased() {
         case "br": return "\n"
         case "code":
-            let content = inlineChildren(element, markdown: markdown)
+            let content = inlineChildren(element, markdown: markdown, depth: depth)
             if content.isEmpty { return "" }
             guard markdown else { return content }
             // The delimiter must outlive the longest backtick run inside;
@@ -387,7 +427,7 @@ extension Renderer {
             let padded = content.hasPrefix("`") || content.hasSuffix("`")
             return fence + (padded ? " " : "") + content + (padded ? " " : "") + fence
         case "a":
-            let content = inlineChildren(element, markdown: markdown)
+            let content = inlineChildren(element, markdown: markdown, depth: depth)
             guard markdown else { return content }
             let href = ((try? element.attr("href")) ?? "")
                 .trimmingCharacters(in: .whitespaces)
@@ -408,19 +448,21 @@ extension Renderer {
             else { return alt }
             return "![\(alt)](\(absolute))"
         case "strong", "b":
-            let content = inlineChildren(element, markdown: markdown)
+            let content = inlineChildren(element, markdown: markdown, depth: depth)
             return markdown && !content.isEmpty ? "**\(content)**" : content
         case "em", "i":
-            let content = inlineChildren(element, markdown: markdown)
+            let content = inlineChildren(element, markdown: markdown, depth: depth)
             return markdown && !content.isEmpty ? "*\(content)*" : content
         default:
-            return inlineChildren(element, markdown: markdown)
+            return inlineChildren(element, markdown: markdown, depth: depth)
         }
     }
 
-    private static func inlineChildren(_ element: Element, markdown: Bool) -> String {
+    private static func inlineChildren(
+        _ element: Element, markdown: Bool, depth: Int
+    ) -> String {
         trimBlock(element.getChildNodes()
-            .map { inline($0, markdown: markdown) }.joined())
+            .map { inline($0, markdown: markdown, depth: depth + 1) }.joined())
     }
 
     /// One text node's whitespace runs → one space — boundary spaces survive so
@@ -428,6 +470,16 @@ extension Renderer {
     private static func collapse(_ raw: String) -> String {
         raw.replacingOccurrences(
             of: #"[ \t\xA0\n\r]+"#, with: " ", options: .regularExpression)
+    }
+
+    /// `collapse` per line — a `br`'s newline stays a newline, edges untrimmed.
+    private static func collapseLines(_ raw: String) -> String {
+        raw.split(separator: "\n", omittingEmptySubsequences: false)
+            .map {
+                $0.replacingOccurrences(
+                    of: #"[ \t\xA0]+"#, with: " ", options: .regularExpression)
+            }
+            .joined(separator: "\n")
     }
 
     /// Per-line collapse + trim (a `br`'s newline stays a newline) and edge trim —

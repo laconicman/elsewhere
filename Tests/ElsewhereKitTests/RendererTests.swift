@@ -217,6 +217,22 @@ struct RendererTests {
         #expect(!rendered.contains("secret"))
     }
 
+    /// SwiftSoup parses arbitrarily deep trees; the renderer caps DOM depth and
+    /// the subtree past it renders as its collapsed text — no recursion, no
+    /// crash, content kept.
+    @Test func aDeepDomRendersWithoutCrashing() {
+        let divNest = String(repeating: "<div>", count: 5_000) + "leaf"
+        let rendered = Renderer.render(
+            divNest, contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("leaf"))
+        let emNest = String(repeating: "<em>", count: 5_000) + "inner"
+        #expect(Renderer.render(
+            emNest, contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+            .contains("inner"))
+    }
+
     @Test func nestedListsIndentTwoSpacesPerLevel() {
         let rendered = Renderer.render(
             "<body><ul><li>a<ul><li>b<ul><li>c</li></ul></li></ul></li></ul>"
