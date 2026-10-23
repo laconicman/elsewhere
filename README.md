@@ -88,7 +88,9 @@ must never be the way something reads a LAN or link-local address.
 heading when the page has one, the `<main>`/`article`/`[role=main]` region (nav,
 headers, footers, scripts, hidden elements are gone), and a `Source: <final URL>`
 footer. `--format text` runs the same pipeline without the markers — links become
-their text, images their alt text. `--format raw` is the byte-exact body. Anything
+their text, images their alt text. `--format raw` writes the response **bytes**
+verbatim — no decode, render or paging (a 1251 page stays 1251); `--json` still
+carries the decoded text in `body`, since JSON cannot carry bytes. Anything
 that is not HTML — JSON, a `cdn-cgi/trace` body — passes through unchanged for
 every format. `--head` and `--output` ignore `--format`.
 
@@ -96,7 +98,7 @@ every format. `--head` and `--output` ignore `--format`.
 default) and ends a cut page with
 `<elsewhere:truncated next_start_index=M total=T>`; `--start-index M` reads on from
 there. Cuts never split an emoji or a combining sequence — the unit is the
-`Character`, not the byte.
+`Character`, not the byte. Paging applies to rendered text; raw is the bytes.
 
 Known limitation: a JavaScript SPA's HTML shell carries little content — when a
 page had external scripts but renders under 200 characters, `fetch` appends

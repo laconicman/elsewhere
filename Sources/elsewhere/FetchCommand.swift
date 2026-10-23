@@ -20,10 +20,12 @@ struct FetchCommand: AsyncParsableCommand {
         --timeout bounds the whole fetch, not a single read. Private/local
         destinations are refused unless --allow-private. Exit status is 0 even on
         HTTP >= 400 — the status is data. --format markdown turns HTML
-        into Markdown with a Source: footer (text strips the markers, raw is
-        byte-exact); --max-length N stops at N characters and ends the page with a
-        <elsewhere:truncated next_start_index=M total=T> marker — pass M to
-        --start-index to read on. --head and --output ignore --format.
+        into Markdown with a Source: footer (text strips the markers, raw prints
+        the response bytes verbatim); --max-length N stops at N characters and
+        ends the page with a <elsewhere:truncated next_start_index=M total=T>
+        marker — pass M to --start-index to read on. Paging applies to rendered
+        text; raw is the bytes. --json's body is always the decoded text (JSON
+        cannot carry bytes). --head and --output ignore --format.
         """
     )
 
@@ -55,13 +57,13 @@ struct FetchCommand: AsyncParsableCommand {
     @Flag(help: "Print a JSON result object on stdout instead of the body.")
     var json = false
 
-    @Option(help: "Body format: markdown (default), text or raw. Applies to a decoded body.")
+    @Option(help: "Body format: markdown (default), text or raw. raw is the response bytes verbatim; --json still carries decoded text.")
     var format: OutputFormat = .markdown
 
-    @Option(help: "Characters to print; 0 = unlimited (default 0).")
+    @Option(help: "Characters of rendered text to print (markdown/text only); 0 = unlimited (default 0).")
     var maxLength = 0
 
-    @Option(help: "Character index to start at — a truncation marker's next_start_index.")
+    @Option(help: "Character index to start rendered text at — a truncation marker's next_start_index.")
     var startIndex = 0
 
     func validate() throws {
@@ -178,6 +180,9 @@ struct FetchCommand: AsyncParsableCommand {
                 throw .fetch("cannot write \(output): \(error.localizedDescription)")
             }
             printError("saved \(result.body.count) bytes to \(output)")
+        } else if format == .raw {
+            // The wire bytes — a 1251 page would corrupt through String round-trip.
+            FileHandle.standardOutput.write(result.body)
         } else if let body {
             FileHandle.standardOutput.write(Data(body.utf8))
         } else {
