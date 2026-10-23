@@ -62,7 +62,7 @@ relying on a contract; a wrong edge is discovered at runtime.
 **Discharge:** swift-libxray 0.2.0 pins the edges with tests; the guards stay as
 defense-in-depth.
 
-### TD-7 — the body is read byte by byte — *open*
+### TD-7 — the body is read byte by byte — *open*, [#14](https://github.com/laconicman/elsewhere/issues/14)
 
 `Fetcher` consumes `session.bytes(for:)`'s `AsyncBytes` one `UInt8` at a time so the
 5 MB cap can cut mid-stream. Measured 2026-10-24: the 5.6 MB loopback body through a
