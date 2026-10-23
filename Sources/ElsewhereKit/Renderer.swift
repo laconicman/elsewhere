@@ -225,7 +225,11 @@ extension Renderer {
             return listItems(element, ordered: element.tagName() == "ol",
                              indent: "", markdown: markdown, depth: depth)
         case "li":
-            return ["- " + trimBlock(inline(element, markdown: markdown, depth: depth))]
+            // An `li` with no list parent still reads as an item — shield its
+            // text per line like a paragraph's.
+            return ["- " + escapeLineStarts(
+                trimBlock(inline(element, markdown: markdown, depth: depth)),
+                markdown: markdown)]
         case "blockquote":
             let inner = blocks(of: element, markdown: markdown, depth: depth)
             // `> ` is a Markdown delimiter — plain text keeps the paragraphs bare.
@@ -263,15 +267,10 @@ extension Renderer {
         // No `br`/`img` arms: both are inline tags, so `blocks(of:)` routes them
         // into a paragraph's inline run — they never reach `block()`.
         default:
-            // A container (div, section, main, article, figure, details, dl, …) or an
-            // unknown element: blocks inside become their own blocks, inline content
-            // a paragraph.
-            let children = blocks(of: element, markdown: markdown, depth: depth)
-            if !children.isEmpty { return children }
-            let text = escapeLineStarts(
-                trimBlock(inline(element, markdown: markdown, depth: depth)),
-                markdown: markdown)
-            return text.isEmpty ? [] : [text]
+            // A container (div, section, main, article, figure, details, dl, …)
+            // or an unknown element — `blocks(of:)` already surfaces every kind
+            // of child: blocks as blocks, an inline run as a paragraph.
+            return blocks(of: element, markdown: markdown, depth: depth)
         }
     }
 

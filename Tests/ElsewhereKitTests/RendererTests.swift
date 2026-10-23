@@ -470,6 +470,16 @@ struct RendererTests {
 
     /// An all-empty `<tr>` pads to whitespace-only cells; text mode drops it
     /// like the Markdown branch does — two real rows yield two lines.
+    /// An `li` with no list parent renders as an item — its text shields like a
+    /// paragraph's, so a heading inside can't open a block mid-item.
+    @Test func anOrphanLiShieldsItsText() {
+        let rendered = Renderer.render(
+            "<body><li># not a heading</li></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("- \\# not a heading"))
+    }
+
     @Test func textModeTablesSkipEmptyRows() {
         let rendered = Renderer.render(
             "<body><table><tr><td>a</td></tr><tr></tr>"
