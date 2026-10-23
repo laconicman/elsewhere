@@ -242,7 +242,7 @@ public enum Doctor {
     /// `vless/xhttp+reality → proxy.example.com:8443` — everything read *after* redaction,
     /// and classic `vnext`/`servers` shapes are read too (C5: the loader accepts both).
     static func describe(_ outbound: JSONValue) -> String {
-        let redacted = Redactor.redact(outbound)
+        let redacted = Redactor.redact(outbound.singleOutbound)
         guard case .object(let object) = redacted,
             case .string(let proto)? = object["protocol"]
         else { return "invalid outbound (no protocol)" }

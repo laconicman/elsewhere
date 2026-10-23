@@ -80,7 +80,8 @@ struct ExitsAdd: AsyncParsableCommand {
     }
 
     /// Builds and validates the exit: links and xray objects go through the engine's
-    /// converter/validator now — a typo fails here, not at fetch time.
+    /// converter *and* its `test` now — a typo fails here, not at fetch time. The
+    /// stored value is what `ExitValidator` returns (an `xray` wrapper is unwrapped).
     private func resolvedExit() async throws(ElsewhereError) -> Exit {
         let sources = [link != nil, xray != nil, proxy != nil].filter { $0 }.count
         guard sources == 1 else {
@@ -88,9 +89,7 @@ struct ExitsAdd: AsyncParsableCommand {
         }
         if let link {
             let text = try await readLink(link)
-            let exit = Exit.link(text)
-            _ = try await ExitResolver.outbound(for: exit, named: name)
-            return exit
+            return try await ExitValidator.validate(.link(text), named: name)
         }
         if let path = xray {
             let data: Data
@@ -105,9 +104,7 @@ struct ExitsAdd: AsyncParsableCommand {
             } catch {
                 throw .exit("\(path) is not a JSON object: \(error.localizedDescription)")
             }
-            let exit = Exit.xray(value)
-            _ = try await ExitResolver.outbound(for: exit, named: name)
-            return exit
+            return try await ExitValidator.validate(.xray(value), named: name)
         }
         if let raw = proxy {
             guard let url = URL(string: raw), let scheme = url.scheme,

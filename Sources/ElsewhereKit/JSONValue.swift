@@ -52,6 +52,20 @@ extension JSONValue: Codable {
 }
 
 extension JSONValue {
+    /// A stored `xray` value may be the bare outbound or INCY's `{"outbounds":[<one>]}`
+    /// export wrapper — the one place that unwraps, so `ExitResolver`, `summary` and
+    /// `describe` agree (a hand-edited wrapper still lists correctly). Anything that is
+    /// not exactly one wrapped object comes back unchanged; `ExitResolver` turns that
+    /// case into `.exit`.
+    var singleOutbound: JSONValue {
+        guard case .array(let outbounds) = self["outbounds"], outbounds.count == 1,
+            case .object = outbounds[0]
+        else { return self }
+        return outbounds[0]
+    }
+}
+
+extension JSONValue {
     /// The `JSONSerialization`-compatible shape (`[String: Any]` / `[Any]` / `NSNumber`)
     /// — `XrayConfigBuilder` serializes through it with `.sortedKeys`, which renders a
     /// whole-number `Double` like 49152 as the integer `49152`, the form Xray's uint16

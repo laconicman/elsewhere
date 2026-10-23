@@ -17,13 +17,13 @@ public enum ExitResolver {
             // C5 §1–2: the loader accepts the flat shape and the classic `vnext`/`servers`
             // one, so pasted JSON (INCY's export carries `{"outbounds":[<one>]}`) works —
             // unwrap exactly one outbound, pass everything else through to `test`.
-            guard case .object(let object) = value,
-                case .array(let outbounds) = object["outbounds"]
-            else { return value }
-            guard outbounds.count == 1, case .object = outbounds[0] else {
-                throw .exit("xray exit '\(name)' wraps \(outbounds.count) outbounds, expected 1")
+            let unwrapped = value.singleOutbound
+            if unwrapped == value, case .array(let outbounds) = value["outbounds"] {
+                // It IS a wrapper, but not exactly one object — not an outbound.
+                throw .exit(
+                    "xray exit '\(name)' wraps \(outbounds.count) outbounds, expected 1")
             }
-            return outbounds[0]
+            return unwrapped
         case .link(let link):
             let data: Data
             do throws(XrayError) {

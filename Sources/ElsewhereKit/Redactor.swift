@@ -158,7 +158,9 @@ public enum Redactor {
         case .link(let link):
             return "link \(redact(link: link))"
         case .xray(let value):
-            let redacted = redact(value)
+            // `singleOutbound`: a hand-edited `{"outbounds":[<one>]}` wrapper still
+            // summarizes by its inner protocol rather than as "invalid".
+            let redacted = redact(value.singleOutbound)
             guard case .object(let object) = redacted,
                 case .string(let proto)? = object["protocol"]
             else { return "xray (invalid: no protocol)" }
