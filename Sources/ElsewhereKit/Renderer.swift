@@ -583,6 +583,9 @@ extension Renderer {
         switch element.tagName().lowercased() {
         case "br": return "\n"
         case "code":
+            // inLinkLabel deliberately not forwarded: code spans bind tighter
+            // than the brackets in link text (CommonMark 6.1 vs 6.2), so a
+            // bracket inside a code span in a label is legal unescaped.
             let raw = inlineChildren(element, markdown: markdown, depth: depth)
             let content = trimBlock(raw)
             guard markdown, !content.isEmpty else { return raw }
@@ -618,17 +621,20 @@ extension Renderer {
             else { return alt }
             return "![\(alt)](\(absolute))"
         case "strong", "b":
-            let raw = inlineChildren(element, markdown: markdown, depth: depth)
+            let raw = inlineChildren(
+                element, markdown: markdown, depth: depth, inLinkLabel: inLinkLabel)
             let content = trimBlock(raw)
             guard markdown, !content.isEmpty else { return raw }
             return withEdgeSpaces(raw, around: "**\(content)**")
         case "em", "i":
-            let raw = inlineChildren(element, markdown: markdown, depth: depth)
+            let raw = inlineChildren(
+                element, markdown: markdown, depth: depth, inLinkLabel: inLinkLabel)
             let content = trimBlock(raw)
             guard markdown, !content.isEmpty else { return raw }
             return withEdgeSpaces(raw, around: "*\(content)*")
         default:
-            return inlineChildren(element, markdown: markdown, depth: depth)
+            return inlineChildren(
+                element, markdown: markdown, depth: depth, inLinkLabel: inLinkLabel)
         }
     }
 

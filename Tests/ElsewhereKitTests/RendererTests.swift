@@ -204,6 +204,21 @@ struct RendererTests {
         #expect(!rendered.contains("[t]("))
     }
 
+    /// `[`/`]` in a label escapes at every depth — a bare bracket inside a
+    /// `span`/`b` would close the link early; inside a code span it's legal
+    /// (code spans bind tighter than link brackets).
+    @Test func linkLabelsEscapeBracketsAtEveryDepth() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"/u\"><span>[x]</span></a> "
+                + "<a href=\"/u\"><b>[y]</b></a> "
+                + "<a href=\"/u\"><code>a]b</code></a></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("[\\[x\\]](https://example.com/u)"))
+        #expect(rendered.contains("[**\\[y\\]**](https://example.com/u)"))
+        #expect(rendered.contains("[`a]b`](https://example.com/u)"))
+    }
+
     /// A link wrapping block children can't inline-wrap them — the blocks stay
     /// and the destination survives as a link line of the `a`'s own text.
     @Test func aLinkWrappingBlocksKeepsItsDestination() {
