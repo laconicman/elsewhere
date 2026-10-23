@@ -35,6 +35,9 @@ public enum LoopbackProbe {
                     }
                     guard first else { return }
                     connection.cancel()
+                    // The handler captures finish; finish captures the connection; the
+                    // connection retains its handler — nil it to break the cycle.
+                    connection.stateUpdateHandler = nil
                     continuation.resume(returning: answer)
                 }
                 connection.stateUpdateHandler = { state in

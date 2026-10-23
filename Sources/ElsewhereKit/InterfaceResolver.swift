@@ -17,29 +17,42 @@ public enum InterfaceResolver {
     /// default route. One-shot: the monitor is cancelled on the first path update, or on
     /// `timeout` with nil.
     public static func physicalInterfaceName(timeout: Duration = .seconds(2)) async -> String? {
-        await withCheckedContinuation { continuation in
-            let monitor = NWPathMonitor(prohibitedInterfaceTypes: [.other, .loopback])
-            let resumed = Mutex(false)
-            let finish: @Sendable (String?) -> Void = { name in
-                let first = resumed.withLock { seen in
-                    if seen { return false }
-                    seen = true
-                    return true
+        // The handler captures finish; finish captures the monitor; the monitor retains
+        // its handler — a cycle that would outlive the call, so finish nils it. The box
+        // keeps finish reachable from onCancel: a cancelled caller resumes at once
+        // instead of riding out the timeout. The timeout Task keeps burning its sleep
+        // after an early finish — bounded waste, harmless.
+        let finishBox = Mutex<(@Sendable (String?) -> Void)?>(nil)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                let monitor = NWPathMonitor(prohibitedInterfaceTypes: [.other, .loopback])
+                let resumed = Mutex(false)
+                let finish: @Sendable (String?) -> Void = { name in
+                    let first = resumed.withLock { seen in
+                        if seen { return false }
+                        seen = true
+                        return true
+                    }
+                    guard first else { return }
+                    finishBox.withLock { $0 = nil }
+                    monitor.cancel()
+                    monitor.pathUpdateHandler = nil
+                    continuation.resume(returning: name)
                 }
-                guard first else { return }
-                monitor.cancel()
-                continuation.resume(returning: name)
+                finishBox.withLock { $0 = finish }
+                monitor.pathUpdateHandler = { path in
+                    finish(path.availableInterfaces.first {
+                        [.wifi, .wiredEthernet, .cellular].contains($0.type)
+                    }?.name)
+                }
+                monitor.start(queue: .global())
+                Task {
+                    try? await Task.sleep(for: timeout)
+                    finish(nil)
+                }
             }
-            monitor.pathUpdateHandler = { path in
-                finish(path.availableInterfaces.first {
-                    [.wifi, .wiredEthernet, .cellular].contains($0.type)
-                }?.name)
-            }
-            monitor.start(queue: .global())
-            Task {
-                try? await Task.sleep(for: timeout)
-                finish(nil)
-            }
+        } onCancel: {
+            finishBox.withLock { $0 }?(nil)
         }
     }
 

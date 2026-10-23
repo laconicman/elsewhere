@@ -1,5 +1,6 @@
 import Foundation
 import Network
+import Synchronization
 
 /// Answers whatever it receives with one canned response, then closes. Stands in for
 /// INCY's `mixed` inbound (the `proxy` exit doctor probes) and for "something listening"
@@ -16,7 +17,13 @@ final class EchoServer: Sendable {
         listener = try NWListener(using: parameters)
     }
 
+    /// `start` waited longer than this — the suite must fail, not hang.
+    struct StartTimeout: Error {}
+
     /// Starts listening on loopback; returns the bound port once the listener is ready.
+    /// One-shot like `LoopbackProbe`: first verdict wins (Mutex), `.cancelled` and a
+    /// 5-second ceiling both throw, and a cancelled caller cancels the listener — a
+    /// parked continuation would hang the suite.
     func start() async throws -> UInt16 {
         listener.newConnectionHandler = { connection in
             connection.start(queue: .global())
@@ -26,16 +33,39 @@ final class EchoServer: Sendable {
                     completion: .contentProcessed { _ in connection.cancel() })
             }
         }
-        return try await withCheckedThrowingContinuation { continuation in
-            listener.stateUpdateHandler = { state in
-                switch state {
-                case .ready: continuation.resume(returning: self.listener.port?.rawValue ?? 0)
-                case .failed(let error): continuation.resume(throwing: error)
-                default: return
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let resumed = Mutex(false)
+                let finish: @Sendable (Result<UInt16, any Error>) -> Void = { result in
+                    let first = resumed.withLock { seen in
+                        if seen { return false }
+                        seen = true
+                        return true
+                    }
+                    guard first else { return }
+                    self.listener.stateUpdateHandler = nil // one-shot; break handler↔listener
+                    continuation.resume(with: result)
                 }
-                self.listener.stateUpdateHandler = nil   // resumed once; a later state must not resume again
+                listener.stateUpdateHandler = { state in
+                    switch state {
+                    case .ready:
+                        finish(.success(self.listener.port?.rawValue ?? 0))
+                    case .failed(let error):
+                        finish(.failure(error))
+                    case .cancelled:
+                        finish(.failure(CancellationError()))
+                    default:
+                        return // .preparing/.waiting — a verdict or the timeout ends it
+                    }
+                }
+                listener.start(queue: .global())
+                Task {
+                    try? await Task.sleep(for: .seconds(5))
+                    finish(.failure(StartTimeout()))
+                }
             }
-            listener.start(queue: .global())
+        } onCancel: {
+            listener.cancel()
         }
     }
 
