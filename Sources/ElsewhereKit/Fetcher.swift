@@ -58,6 +58,8 @@ public struct FetchResult: Sendable {
     public var requestURL: URL
     public var finalURL: URL
     public var status: Int
+    /// Response headers, keys lowercased — `headers["content-type"]`, not the wire
+    /// spelling (HTTP field names are case-insensitive; one normalization for all).
     public var headers: [String: String]
     public var contentType: String?
     public var body: Data
@@ -281,7 +283,7 @@ public enum Fetcher {
                 finalURL: http.url ?? request.url,
                 status: http.statusCode,
                 headers: http.allHeaderFields.reduce(into: [:]) {
-                    $0["\($1.key)"] = "\($1.value)"
+                    $0["\($1.key)".lowercased()] = "\($1.value)"
                 },
                 contentType: http.value(forHTTPHeaderField: "Content-Type"),
                 body: body,

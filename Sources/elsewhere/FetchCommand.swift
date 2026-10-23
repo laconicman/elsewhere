@@ -10,8 +10,10 @@ struct FetchCommand: AsyncParsableCommand {
         commandName: "fetch",
         abstract: "Fetch one URL through an exit; the body goes to stdout, metadata to stderr or --json.",
         discussion: """
-        Defaults: GET, up to 10 redirects, 25 s timeout, a 5 MB body cap (truncated
-        bodies are flagged), a Chrome User-Agent unless --user-agent says otherwise.
+        Defaults: GET, up to \(FetchLimits.maxRedirects) redirects,
+        \(FetchLimits.timeout.components.seconds) s timeout,
+        a \(FetchLimits.maxBodyBytes / 1_000_000) MB body cap (truncated bodies are
+        flagged), a Chrome User-Agent unless --user-agent says otherwise.
         --timeout bounds the whole fetch, not a single read. Private/local
         destinations are refused unless --allow-private. Exit status is 0 even on
         HTTP >= 400 — the status is data.
@@ -34,8 +36,8 @@ struct FetchCommand: AsyncParsableCommand {
     @Option(help: "User-Agent override (default: the config's — Chrome unless changed).")
     var userAgent: String?
 
-    @Option(help: "Timeout in seconds — bounds the whole fetch, not a single read (default 25).")
-    var timeout = 25
+    @Option(help: "Timeout in seconds — bounds the whole fetch, not a single read (default \(FetchLimits.timeout.components.seconds)).")
+    var timeout = Int(FetchLimits.timeout.components.seconds)
 
     @Option(help: "Save the body to this file instead of printing it.")
     var output: String?
@@ -78,7 +80,7 @@ struct FetchCommand: AsyncParsableCommand {
             let requestHeaders = parsed // let — a Sendable-safe capture
             let config = try options.store.load(
                 environment: ProcessInfo.processInfo.environment)
-            let ua = userAgent ?? config.userAgent.string
+            let ua = userAgent ?? config.userAgent.headerValue
 
             let result = try await withSignalCancellation { () async throws(ElsewhereError) in
                 try await Session.withRoute(
@@ -158,7 +160,7 @@ struct FetchCommand: AsyncParsableCommand {
                     + "pass --output FILE to save it")
         }
         if result.truncated {
-            printError("body truncated at 5 MB")
+            printError("body truncated at \(FetchLimits.maxBodyBytes / 1_000_000) MB")
         }
         if result.status >= 400 {
             // host + path, no scheme — the pattern scrub strips `scheme://` tokens.

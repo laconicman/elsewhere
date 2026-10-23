@@ -147,6 +147,8 @@ struct ExitSelectionTests {
         #expect(try ExitSelection.direct.resolve(in: config) == "direct")
         #expect(try ExitSelection.named("incy").resolve(in: config) == "incy")
         #expect(try ExitSelection.default.resolve(in: config) == "moldova")
+        // `--exit direct` names the lane — never a stored exit.
+        #expect(try ExitSelection.named("direct").resolve(in: config) == "direct")
     }
 
     @Test func missingNamesAndMissingDefaultsThrow() {

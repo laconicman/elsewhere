@@ -18,7 +18,8 @@ struct ExitOptions: ParsableArguments {
     }
 
     var selection: ExitSelection {
-        if direct { return .direct }
+        // `--exit direct` names the direct lane, like the flag does.
+        if direct || exitName == "direct" { return .direct }
         if let exitName { return .named(exitName) }
         return .default
     }
@@ -49,15 +50,5 @@ struct TunnelOptions: ParsableArguments {
     /// `--via-system` unbinds; otherwise the config's `bindInterface` stands.
     func bindInterface(from config: ElsewhereConfig) -> BindInterface {
         viaSystem ? .none : config.bindInterface
-    }
-}
-
-extension UserAgent {
-    /// The header string — `chrome` renders as the pinned Chrome UA (TD-1).
-    var string: String {
-        switch self {
-        case .chrome: UserAgent.chromeString
-        case .custom(let custom): custom
-        }
     }
 }

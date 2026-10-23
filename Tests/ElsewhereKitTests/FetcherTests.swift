@@ -121,11 +121,11 @@ struct FetcherTests {
                 request(base.appendingPathComponent("head"), method: .head), via: route)
             #expect(result.status == 200)
             #expect(result.body.isEmpty)
-            #expect(result.headers["Content-Length"] != nil)
+            #expect(result.headers["content-length"] != nil)
         }
     }
 
-    @Test func aRefusedDestinationIsAFetchError() async throws {
+    @Test func aConnectionRefusedPortIsAFetchError() async throws {
         // A port that was bound and is now closed — connection refused.
         let closed = try TestHTTPServer()
         let closedPort = try await closed.start()

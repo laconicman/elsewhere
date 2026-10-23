@@ -142,6 +142,14 @@ public enum UserAgent: Sendable, Hashable {
     public static let chromeString =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
         + "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+
+    /// The header string — `chrome` renders as the pinned Chrome UA (TD-1).
+    public var headerValue: String {
+        switch self {
+        case .chrome: UserAgent.chromeString
+        case .custom(let custom): custom
+        }
+    }
 }
 
 extension UserAgent: Codable {
