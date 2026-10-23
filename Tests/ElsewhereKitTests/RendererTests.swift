@@ -422,6 +422,54 @@ struct RendererTests {
         #expect(rendered.contains("\n2026\n"))
     }
 
+    /// A `br` line inside a paragraph can carry a marker — every line is
+    /// shielded, not just the first (the Devin finding: `intro<br>- item`).
+    @Test func everyLineIsShieldedNotJustTheFirst() {
+        let rendered = Renderer.render(
+            "<body><div>intro<br>- item</div></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("intro\n\\- item"))
+    }
+
+    /// Every line-start shape that would open a block takes a backslash.
+    @Test func everyBlockOpenerIsEscaped() {
+        let rendered = Renderer.render(
+            "<body><p>> quoted?</p><p>1) alt-numbered</p><p>```fence</p>"
+                + "<p>~~~tilde</p><p>***</p><p>===</p><p>&lt;div</p>"
+                + "<p>[x]: /y</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("\\> quoted?"))
+        #expect(rendered.contains("1\\) alt-numbered"))
+        #expect(rendered.contains("\\```fence")) // a fence would swallow to EOF
+        #expect(rendered.contains("\\~~~tilde"))
+        #expect(rendered.contains("\\***"))
+        #expect(rendered.contains("\\==="))
+        #expect(rendered.contains("\\<div"))
+        #expect(rendered.contains("\\[x]: /y")) // a link def renders invisibly
+    }
+
+    /// A legit leading `[text](url)` is not a link reference definition — the
+    /// link keeps its syntax, no backslash.
+    @Test func aLeadingLinkIsNotEscaped() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"/u\">link</a> first</p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.hasPrefix("[link](https://example.com/u) first"))
+        #expect(!rendered.contains("\\["))
+    }
+
+    /// List-item text is shielded too — `- - item` would nest a real list.
+    @Test func itemTextIsShieldedPerLine() {
+        let rendered = Renderer.render(
+            "<body><ul><li>- item</li></ul></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("- \\- item"))
+    }
+
     // MARK: - text format
 
     @Test func textStripsMarkersButKeepsStructure() {

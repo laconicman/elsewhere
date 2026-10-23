@@ -142,7 +142,7 @@ extension Renderer {
         var blocks: [String] = []
         var run: [Node] = []
         func flushRun() {
-            let text = escapeBlockStart(
+            let text = escapeLineStarts(
                 trimBlock(run.map { inline($0, markdown: markdown, depth: depth + 1) }
                     .joined()),
                 markdown: markdown)
@@ -170,7 +170,7 @@ extension Renderer {
             guard !text.isEmpty else { return [] }
             return [markdown ? String(repeating: "#", count: level) + " " + text : text]
         case "p", "figcaption", "address", "caption", "dt", "dd", "summary", "legend":
-            let text = escapeBlockStart(
+            let text = escapeLineStarts(
                 trimBlock(inline(element, markdown: markdown, depth: depth)),
                 markdown: markdown)
             return text.isEmpty ? [] : [text]
@@ -205,7 +205,7 @@ extension Renderer {
             // a paragraph.
             let children = blocks(of: element, markdown: markdown, depth: depth)
             if !children.isEmpty { return children }
-            let text = escapeBlockStart(
+            let text = escapeLineStarts(
                 trimBlock(inline(element, markdown: markdown, depth: depth)),
                 markdown: markdown)
             return text.isEmpty ? [] : [text]
@@ -267,7 +267,9 @@ extension Renderer {
             for segment in segments {
                 switch segment {
                 case .text(let raw):
-                    let text = trimBlock(raw)
+                    // Item text is shielded per line too — a continuation can
+                    // carry a marker.
+                    let text = escapeLineStarts(trimBlock(raw), markdown: markdown)
                     if text.isEmpty { continue }
                     if bulletUsed {
                         let column = indent
@@ -514,25 +516,57 @@ extension Renderer {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
-    /// A paragraph whose first characters would open a block gets a backslash —
-    /// the whole of the escaping stance (`#`/`>` at line start, `- `/`+ `/`* `, a
-    /// `12. ` numbered-list start). Markdown only: plain text carries no markers
-    /// and so needs no shielding.
-    private static func escapeBlockStart(_ text: String, markdown: Bool) -> String {
-        guard markdown, let first = text.first else { return text }
-        if first == "#" || first == ">" { return "\\" + text }
+    /// Every line of a block is shielded from opening a block — a `br` line or a
+    /// continuation can carry a marker just like a paragraph start. Markdown
+    /// only: plain text carries no markers and so needs no shielding.
+    private static func escapeLineStarts(_ text: String, markdown: Bool) -> String {
+        guard markdown else { return text }
+        return text.split(separator: "\n", omittingEmptySubsequences: false)
+            .map { escapeLineStart(String($0)) }
+            .joined(separator: "\n")
+    }
+
+    /// One line, one backslash when its first characters would open a block —
+    /// the whole of the escaping stance. A leading `[` is left alone unless the
+    /// line is a link reference definition (`[x]:`), which renders invisibly.
+    private static func escapeLineStart(_ line: String) -> String {
+        guard let first = line.first else { return line }
+        // `# heading`, `> quote` — one backslash ahead.
+        if first == "#" || first == ">" { return "\\" + line }
+        // `- `/`+ `/`* ` — a bullet.
         if (first == "-" || first == "+" || first == "*"),
-            text.dropFirst().first == " "
-        { return "\\" + text }
+            line.dropFirst().first == " "
+        { return "\\" + line }
+        // A ``` or ~~~ run — a fence opener would swallow everything to EOF.
+        if (first == "`" || first == "~"),
+            line.hasPrefix(String(repeating: first, count: 3))
+        { return "\\" + line }
+        // A line of only 3+ repeats of one marker — a rule or setext line.
+        if line.count >= 3, "`~*_=-".contains(first),
+            line.allSatisfy({ $0 == first })
+        { return "\\" + line }
+        // `<x`, `</`, `<!` — an HTML block opener.
+        if first == "<", let second = line.dropFirst().first,
+            second.isLetter || second == "/" || second == "!"
+        { return "\\" + line }
+        // `12. `/`12) ` — an ordered item; the marker char takes the backslash.
         if first.isNumber {
-            var i = text.startIndex
-            while i < text.endIndex, text[i].isNumber { i = text.index(after: i) }
-            guard i < text.endIndex, text[i] == "." else { return text }
-            let afterDot = text.index(after: i)
-            if afterDot < text.endIndex, text[afterDot] == " " {
-                return String(text[..<i]) + "\\." + text[afterDot...]
+            var i = line.startIndex
+            while i < line.endIndex, line[i].isNumber { i = line.index(after: i) }
+            if i < line.endIndex, line[i] == "." || line[i] == ")" {
+                let after = line.index(after: i)
+                if after < line.endIndex, line[after] == " " {
+                    return String(line[..<i]) + "\\" + String(line[i]) + line[after...]
+                }
             }
+            return line
         }
-        return text
+        // `[x]:` — a link reference definition is invisible content. A line that
+        // merely starts with a link (`[text](url)`) has no `]:` and stays.
+        if first == "[", let close = line.firstIndex(of: "]") {
+            let after = line.index(after: close)
+            if after < line.endIndex, line[after] == ":" { return "\\" + line }
+        }
+        return line
     }
 }
