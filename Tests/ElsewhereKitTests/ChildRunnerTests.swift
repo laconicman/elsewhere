@@ -44,6 +44,21 @@ struct ChildRunnerTests {
         #expect(status == 1)
     }
 
+    /// Cancellation reaches the child: SIGTERM is forwarded (`sleep` dies to it),
+    /// the reaped 128 + 15 flows back, and nothing waits the remaining ~30 s.
+    @Test func cancellingTheWaitTerminatesTheChild() async throws {
+        let began = ContinuousClock.now
+        let task = Task {
+            try await ChildRunner.run(
+                ["/bin/sleep", "30"], via: .inbound(exit: "t", port: 9))
+        }
+        try await Task.sleep(for: .milliseconds(200))
+        task.cancel()
+        let status = try await task.value
+        #expect(status == 143) // 128 + SIGTERM
+        #expect(ContinuousClock.now - began < .seconds(1))
+    }
+
     @Test func anEmptyCommandIsUsage() async {
         do {
             _ = try await ChildRunner.run([], via: .inbound(exit: "t", port: 9))

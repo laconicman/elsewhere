@@ -139,7 +139,10 @@ everything lands in upper and lower case because tools disagree on which they re
 status is ours — 128 + signal on a signal death — and the parent ignores
 SIGINT/SIGTERM while it lives: the terminal already delivered them to the whole
 foreground group, so the child gets its own copy and the parent must outlive it to
-stop the tunnel. **Rejected:** per-app routing machinery (pf, a transparent proxy) —
+stop the tunnel. Task cancellation is forwarded to the child — `terminate()` (SIGTERM)
+first, a `SIGKILL` five seconds later if it still stands — and the reaped status
+(143/137) flows back like any other exit. **Rejected:** per-app routing machinery
+(pf, a transparent proxy) —
 heavier than the contract needs.
 
 ## Signals cancel the work; the exit is 128 + the signal
