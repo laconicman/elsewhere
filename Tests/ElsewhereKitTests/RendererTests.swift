@@ -358,6 +358,26 @@ struct RendererTests {
         #expect(rendered.contains("`` `tick` ``"))
     }
 
+    /// `br` inside `pre` is a line break — the one construct promising verbatim
+    /// whitespace keeps it.
+    @Test func preKeepsBrLineBreaks() {
+        let rendered = Renderer.render(
+            "<body><pre>line1<br>line2</pre></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("line1\nline2"))
+    }
+
+    /// The `<pre>` convention forgives one newline right after the tag; every
+    /// other edge newline is authored content.
+    @Test func preKeepsItsOwnBlankLines() {
+        let rendered = Renderer.render(
+            "<body><pre>\n\ncode\n\n</pre></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("```\n\ncode\n\n```"))
+    }
+
     // MARK: - The shell note and whitespace
 
     @Test func jsShellNoteOnOffAroundTheThreshold() {

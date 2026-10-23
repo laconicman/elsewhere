@@ -308,8 +308,11 @@ extension Renderer {
                     } ?? ""
             }
         }
-        let code = wholeText(pre, depth: depth + 1)
-            .trimmingCharacters(in: CharacterSet(charactersIn: "\n"))
+        // The HTML convention forgives ONE newline right after <pre>; every
+        // other edge newline is authored content and survives.
+        var code = wholeText(pre, depth: depth + 1)
+        if code.hasPrefix("\n") { code.removeFirst() }
+        if code.hasSuffix("\n") { code.removeLast() }
         // The fence must outlive the longest backtick run inside the code
         // (CommonMark 4.5 — a triple inside a triple would end the block early).
         let fence = String(repeating: "`", count: max(3, longestBacktickRun(code) + 1))
@@ -343,6 +346,8 @@ extension Renderer {
         return element.getChildNodes().map { node in
             if let text = node as? TextNode { return text.getWholeText() }
             if let child = node as? Element {
+                // The one construct promising verbatim whitespace keeps br.
+                if child.tagName().lowercased() == "br" { return "\n" }
                 return wholeText(child, depth: depth + 1)
             }
             return ""
