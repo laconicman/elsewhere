@@ -159,6 +159,22 @@ struct RendererTests {
         #expect(!rendered.contains("Menu"))
     }
 
+    /// A credentialled `finalURL` can't leak userinfo into relative
+    /// destinations — the parse base strips it, so `absUrl` resolves clean.
+    @Test func relativeLinksResolveAgainstACredentialFreeBase() {
+        let rendered = Renderer.render(
+            "<body><p><a href=\"/x\">a</a> <a href=\"rel\">b</a>"
+                + "<img src=\"img.png\" alt=\"i\"></p></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://user:pw@example.com/dir/page")!,
+            format: .markdown)
+        #expect(rendered.contains("[a](https://example.com/x)"))
+        #expect(rendered.contains("[b](https://example.com/dir/rel)"))
+        #expect(rendered.contains("![i](https://example.com/dir/img.png)"))
+        #expect(!rendered.contains("user") && !rendered.contains("pw")
+            && !rendered.contains("@example.com"))
+    }
+
     /// `..` climbs, `//host` borrows the scheme, and `<base href>` rebases every
     /// relative URL in the document.
     @Test func dotDotSchemeRelativeAndBaseHrefsResolve() {

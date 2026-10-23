@@ -57,7 +57,14 @@ public enum Renderer {
         guard format != .raw else { return text }
         guard looksLikeHTML(text, contentType: contentType) else { return text }
 
-        guard let document = try? SwiftSoup.parse(text, finalURL.absoluteString) else {
+        // The base URL carries no userinfo — `absUrl` would otherwise inherit a
+        // credentialled `finalURL` into every relative link and image.
+        var base = URLComponents(url: finalURL, resolvingAgainstBaseURL: false)
+        base?.user = nil
+        base?.password = nil
+        guard let document = try? SwiftSoup.parse(
+            text, base?.string ?? finalURL.absoluteString)
+        else {
             return text // unparseable HTML is just text
         }
 
