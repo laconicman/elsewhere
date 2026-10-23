@@ -43,6 +43,18 @@ struct ConfigStoreTests {
         #expect(ConfigStore.permissionsAreStrict(store.url))
     }
 
+    @Test func aPreexistingLooseDirectoryIsTightened() throws {
+        let store = store()
+        let fm = FileManager.default
+        try fm.createDirectory(
+            at: store.url.deletingLastPathComponent(), withIntermediateDirectories: true,
+            attributes: [.posixPermissions: 0o755])
+        try store.save(config())
+        let dirMode = try fm.attributesOfItem(
+            atPath: store.url.deletingLastPathComponent().path)[.posixPermissions] as? Int
+        #expect(dirMode == 0o700)
+    }
+
     @Test func missingFileIsAConfigError() {
         do {
             _ = try store().load(environment: [:])

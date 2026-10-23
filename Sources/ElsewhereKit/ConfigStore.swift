@@ -71,8 +71,10 @@ public struct ConfigStore: Sendable {
         return try Self.validated(config)
     }
 
-    /// Writes atomically into a 0700 directory and leaves the file 0600 — set on create
-    /// and after every write, so a looser umask or a rewritten file can't widen it.
+    /// Writes atomically into a 0700 directory and leaves the file 0600. The directory
+    /// is tightened *before* the write: `createDirectory` doesn't re-apply attributes
+    /// to a directory that already exists loose, and the atomic write's temp file must
+    /// never sit exposed in one.
     public func save(_ config: ElsewhereConfig) throws(ElsewhereError) {
         let fileManager = FileManager.default
         let directory = url.deletingLastPathComponent()
@@ -81,14 +83,14 @@ public struct ConfigStore: Sendable {
                 at: directory,
                 withIntermediateDirectories: true,
                 attributes: [.posixPermissions: 0o700])
+            try fileManager.setAttributes(
+                [.posixPermissions: 0o700], ofItemAtPath: directory.path)
             let data = try JSONEncoder.with(config)
             try data.write(to: url, options: .atomic)
             try fileManager.setAttributes([.posixPermissions: 0o600], ofItemAtPath: url.path)
         } catch {
             throw .config("cannot write \(url.path): \(error.localizedDescription)")
         }
-        // Directory created above may have existed already with looser permissions.
-        try? fileManager.setAttributes([.posixPermissions: 0o700], ofItemAtPath: directory.path)
     }
 
     /// The file decoded; now the invariants a hand-edited file could break: the schema
