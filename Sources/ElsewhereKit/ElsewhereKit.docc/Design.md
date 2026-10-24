@@ -136,10 +136,14 @@ embedded v4). The reference MCP fetch server has the same shape.
 
 `run -- CMD` sets `HTTP_PROXY`/`HTTPS_PROXY` to `http://127.0.0.1:PORT` and
 `ALL_PROXY` to `socks5h://127.0.0.1:PORT` — the `mixed` inbound speaks SOCKS5, and
-the `h` keeps DNS remote (the exit resolves, not the LAN). `NO_PROXY` covers loopback;
+the `h` keeps DNS remote (the exit resolves, not the LAN). `NO_PROXY` is the
+parent's bypass list plus loopback — an internal host the parent keeps off a
+proxy stays off ours, which could not resolve it anyway;
 everything lands in upper and lower case because tools disagree on which they read. A
 `proxy` exit passes its configured URL through. The child inherits stdio and its
-status is ours — 128 + signal on a signal death — and the parent ignores
+status is ours — 128 + signal on a signal death (unless the parent itself was
+signalled: then the signal rule below sets the status, whatever the child
+reported) — and the parent ignores
 SIGINT/SIGTERM while it lives: the terminal already delivered them to the whole
 foreground group, so the child gets its own copy and the parent must outlive it to
 stop the tunnel. A `proxy` exit's configured URL — credentials included — is exported

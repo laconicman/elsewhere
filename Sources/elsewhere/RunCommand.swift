@@ -13,7 +13,8 @@ struct RunCommand: AsyncParsableCommand {
         discussion: """
         The child sees HTTP_PROXY/HTTPS_PROXY at http://127.0.0.1:PORT and ALL_PROXY
         at socks5h://127.0.0.1:PORT for a tunnel lane (the `h` keeps DNS remote), or
-        the exit's own URL for a proxy exit; NO_PROXY covers loopback.
+        the exit's own URL for a proxy exit; NO_PROXY keeps your bypass list and
+        adds loopback.
         """
     )
 
