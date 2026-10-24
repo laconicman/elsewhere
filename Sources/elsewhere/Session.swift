@@ -67,11 +67,22 @@ final class SignalWatcher: @unchecked Sendable {
     deinit { stop() }
 }
 
-/// Runs `body` in a task a `SignalWatcher` cancels on SIGINT/SIGTERM. When a signal
-/// was delivered the process exits 128 + signal — the shell convention — instead of
-/// reporting the interruption as an error. For `run`, the terminal already signalled
-/// the whole foreground group, so the child gets its own copy; the parent outlives
-/// it to stop the tunnel.
+/// Exits 128 + the delivered signal — the shell convention — when a signal
+/// arrived, whatever the body did. `task.value` settles only after the session
+/// is closed (`Session.withSession` closes before returning or rethrowing),
+/// so the Go runtime is already stopped either way.
+private func exitIfSignalled(_ delivered: borrowing Mutex<Int32>) {
+    let sig = delivered.withLock { $0 }
+    if sig != 0 { Foundation.exit(128 + sig) }
+}
+
+/// Runs `body` in a task a `SignalWatcher` cancels on SIGINT/SIGTERM. When a
+/// signal was delivered the process exits 128 + signal — the shell convention —
+/// whether the body threw or returned normally (`run`'s child reaps with its
+/// own status once SIGTERM is forwarded; a fetch may finish before the
+/// cancellation lands). For `run`, the terminal already signalled the whole
+/// foreground group, so the child gets its own copy; the parent outlives it to
+/// stop the tunnel.
 func withSignalCancellation<R: Sendable>(
     _ body: @escaping @Sendable () async throws(ElsewhereError) -> R
 ) async throws(ElsewhereError) -> R {
@@ -83,16 +94,20 @@ func withSignalCancellation<R: Sendable>(
     }
     defer { watcher.stop() }
     do {
-        return try await task.value
+        let value = try await task.value
+        // The body may finish normally after a signal — `run`'s child reaps
+        // with its own status once SIGTERM is forwarded, a fetch may complete
+        // before the cancellation lands. The signal still wins: the contract
+        // is 128 + signal.
+        exitIfSignalled(delivered)
+        return value
     } catch let error as ElsewhereError {
-        let sig = delivered.withLock { $0 }
-        if sig != 0 { Foundation.exit(128 + sig) }
+        exitIfSignalled(delivered)
         throw error
     } catch {
         // `task.value` throws `any Error` — a bare CancellationError or anything
         // untyped that escaped. A delivered signal still wins the exit status.
-        let sig = delivered.withLock { $0 }
-        if sig != 0 { Foundation.exit(128 + sig) }
+        exitIfSignalled(delivered)
         throw ElsewhereError.fetch("interrupted")
     }
 }
