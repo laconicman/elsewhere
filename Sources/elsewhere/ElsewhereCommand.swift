@@ -15,7 +15,8 @@ struct ElsewhereCommand: AsyncParsableCommand {
         ELSEWHERE_LINK alone synthesizes one in-memory exit named `env` for ad-hoc use.
 
         Signals: SIGINT/SIGTERM cancel the in-flight work and exit 128 + the signal
-        number — the shell convention. `serve` (MCP) arrives with M2.
+        number — the shell convention. `serve` is the MCP stdio server: on a
+        signal it closes the tunnel, then exits the same way.
 
         Exit status (stable; scripts may rely on it):
         \(ExitStatus.help)
@@ -23,7 +24,7 @@ struct ElsewhereCommand: AsyncParsableCommand {
         version: Elsewhere.version,
         subcommands: [
             FetchCommand.self, WhoAmICommand.self, RunCommand.self,
-            ExitsCommand.self, DoctorCommand.self,
+            ExitsCommand.self, DoctorCommand.self, ServeCommand.self,
         ]
     )
 
