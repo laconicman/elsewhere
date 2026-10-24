@@ -12,5 +12,5 @@ npx --yes @anthropic-ai/mcpb pack . "$out"
 echo
 echo "Done: $out"
 echo "Install: Claude Desktop → Settings → Extensions → drag it in."
-echo "Note: the elsewhere binary is NOT bundled — build it and set its path at install"
-echo "      time (see ../SETUP.md)."
+echo "Note: the elsewhere binary is NOT bundled — build it and place it at ~/.local/bin/elsewhere"
+echo "      (see ../SETUP.md)."
