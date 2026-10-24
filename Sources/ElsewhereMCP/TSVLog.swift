@@ -44,12 +44,24 @@ final class TSVLog: Sendable {
         }
     }
 
-    /// One row; `-` fills the columns an event doesn't carry.
+    /// One row, one line; `-` fills the columns an event doesn't carry. A
+    /// value's control characters flatten to spaces, so no value can split or
+    /// forge a row.
     func log(
         event: String, exit: String = "-", status: String = "-",
         bytes: String = "-", ms: String = "-", url: String = "-"
     ) {
-        let line = "\(Date().formatted(.iso8601))\t\(event)\t\(exit)\t\(status)\t\(bytes)\t\(ms)\t\(url)\n"
-        handle.withLock { $0.write(Data(line.utf8)) }
+        let columns = [
+            Date().formatted(.iso8601), event, exit, status, bytes, ms, url,
+        ].map(Self.flattened)
+        handle.withLock { $0.write(Data((columns.joined(separator: "\t") + "\n").utf8)) }
+    }
+
+    /// `CharacterSet.controlCharacters` (Cc: C0, DEL, C1 — tab, CR, LF among
+    /// them) become spaces: one line per row is the sink's invariant.
+    private static func flattened(_ text: String) -> String {
+        String(String.UnicodeScalarView(text.unicodeScalars.map {
+            CharacterSet.controlCharacters.contains($0) ? " " : $0
+        }))
     }
 }
