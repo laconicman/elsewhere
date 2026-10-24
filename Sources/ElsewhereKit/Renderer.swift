@@ -472,8 +472,8 @@ extension Renderer {
         return "[\(label)](\(dest))"
     }
 
-    /// `[`/`]` in text destined for a link label escape; the label is the only
-    /// context where a bare bracket opens markup the author never wrote.
+    /// `[`/`]` in text destined for a link or image label escape; the label is
+    /// the only context where a bare bracket opens markup the author never wrote.
     private static func escapeBrackets(_ text: String) -> String {
         text.replacingOccurrences(of: "[", with: "\\[")
             .replacingOccurrences(of: "]", with: "\\]")
@@ -660,7 +660,7 @@ extension Renderer {
             guard Self.isLinkable(src, schemes: Self.imageSchemes),
                 let absolute = try? element.absUrl("src"), !absolute.isEmpty
             else { return alt }
-            return "![\(alt)](\(absolute))"
+            return "![\(escapeBrackets(alt))](\(absolute))"
         case "strong", "b":
             let raw = inlineChildren(
                 element, markdown: markdown, depth: depth, inLinkLabel: inLinkLabel)

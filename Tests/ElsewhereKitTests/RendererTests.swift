@@ -282,6 +282,20 @@ struct RendererTests {
         #expect(rendered.contains("![rel](https://example.com/p.png)"))
     }
 
+    /// A bracket inside `alt` would close the image's label early — it escapes
+    /// in Markdown, stays literal in text mode.
+    @Test func bracketsInAltTextEscape() {
+        let html = #"<body><p><img alt="a]b" src="https://example.com/i.png"></p></body>"#
+        let rendered = Renderer.render(
+            html, contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        #expect(rendered.contains("![a\\]b](https://example.com/i.png)"))
+        let plain = Renderer.render(
+            html, contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .text)
+        #expect(plain.contains("a]b"))
+    }
+
     /// A container whose children are text and inline elements without a wrapping
     /// `<p>` is ONE paragraph — the link survives and the words stay together
     /// (the layout-lines defect: they used to split into separate blocks).
