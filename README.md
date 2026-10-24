@@ -146,9 +146,9 @@ holds the secrets. Hand-editable; a redacted shape:
 
 | Variable | Effect |
 |---|---|
-| `ELSEWHERE_CONFIG` | Config path (the `--config` flag beats it). |
+| `ELSEWHERE_CONFIG` | Config path (the `--config` flag beats it); a leading `~` is expanded. |
 | `ELSEWHERE_LINK` | A single `vless://…` link; synthesizes one in-memory exit named `env` and ignores the file entirely. |
-| `ELSEWHERE_XRAY_LOG` | Path for the engine's warnings; `--xray-log` beats it, silent is the default. |
+| `ELSEWHERE_XRAY_LOG` | Path for the engine's warnings; `--xray-log` beats it, silent is the default; a leading `~` is expanded. |
 
 ### MCP server (`elsewhere serve`)
 

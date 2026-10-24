@@ -18,11 +18,13 @@ public struct ConfigStore: Sendable {
     }
 
     /// Precedence (§5.2): `--config` > `ELSEWHERE_CONFIG` > the default path.
+    /// Flag and env values come from shells and host JSON alike — `UserPath`
+    /// expands a leading `~` a host config could not.
     public static func resolveURL(explicit: String?, environment: [String: String]) -> URL {
         if let explicit {
-            URL(fileURLWithPath: explicit)
+            UserPath.url(explicit)
         } else if let envPath = environment["ELSEWHERE_CONFIG"], !envPath.isEmpty {
-            URL(fileURLWithPath: envPath)
+            UserPath.url(envPath)
         } else {
             defaultURL
         }

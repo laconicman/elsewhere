@@ -62,7 +62,7 @@ struct ElsewhereCommand: AsyncParsableCommand {
 
 /// Every subcommand's `--config PATH`, resolved once the same way (§5.2 precedence).
 struct GlobalOptions: ParsableArguments {
-    @Option(help: "Config file; default ~/Library/Application Support/elsewhere/config.json, or $ELSEWHERE_CONFIG.")
+    @Option(help: "Config file; default ~/Library/Application Support/elsewhere/config.json, or $ELSEWHERE_CONFIG. A leading ~ is expanded.")
     var config: String?
 
     /// The resolved store — the flag beats the env var, which beats the default path.

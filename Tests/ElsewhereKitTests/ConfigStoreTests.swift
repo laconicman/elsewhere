@@ -132,6 +132,17 @@ struct ConfigStoreTests {
         #expect(ConfigStore.resolveURL(explicit: nil, environment: [:]) == ConfigStore.defaultURL)
     }
 
+    /// A host's JSON config has no shell — `ELSEWHERE_CONFIG = "~/x"` must still
+    /// resolve under home.
+    @Test func envPathTildeExpandsUnderHome() {
+        #expect(
+            ConfigStore.resolveURL(
+                explicit: nil, environment: ["ELSEWHERE_CONFIG": "~/elsewhere-test.json"])
+                .standardizedFileURL.path
+                == FileManager.default.homeDirectoryForCurrentUser
+                    .appending(path: "elsewhere-test.json").standardizedFileURL.path)
+    }
+
     @Test func newerVersionIsRejected() throws {
         let store = store()
         try store.save(config())

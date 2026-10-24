@@ -35,15 +35,16 @@ struct TunnelOptions: ParsableArguments {
 
     @Option(
         name: .customLong("xray-log"),
-        help: "Write the engine's warnings to this file; env ELSEWHERE_XRAY_LOG; default silent.")
+        help: "Write the engine's warnings to this file; env ELSEWHERE_XRAY_LOG; default silent. A leading ~ is expanded.")
     var xrayLog: String?
 
-    /// Flag beats env, env beats silent.
+    /// Flag beats env, env beats silent. Both are JSON/shell text — `UserPath`
+    /// expands a leading `~`.
     var log: XrayConfigBuilder.XrayLog {
-        if let xrayLog { return .file(xrayLog) }
+        if let xrayLog { return .file(UserPath.expanded(xrayLog)) }
         if let path = ProcessInfo.processInfo.environment["ELSEWHERE_XRAY_LOG"],
             !path.isEmpty
-        { return .file(path) }
+        { return .file(UserPath.expanded(path)) }
         return .silent
     }
 

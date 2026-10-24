@@ -26,7 +26,7 @@ struct ServeCommand: AsyncParsableCommand {
     @Flag(help: "Allow private/local destinations on every fetch and whoami call.")
     var allowPrivate = false
 
-    @Option(name: .customLong("log-tsv"), help: "Append one audit row per call and per tunnel lifecycle edge to this TSV file.")
+    @Option(name: .customLong("log-tsv"), help: "Append one audit row per call and per tunnel lifecycle edge to this TSV file. A leading ~ is expanded.")
     var logTSV: String?
 
     @OptionGroup var tunnel: TunnelOptions
@@ -46,7 +46,7 @@ struct ServeCommand: AsyncParsableCommand {
                 allowPrivate: allowPrivate,
                 viaSystem: tunnel.viaSystem,
                 log: try engineLog(),
-                tsvLog: logTSV.map { URL(fileURLWithPath: $0) })
+                tsvLog: logTSV.map { UserPath.url($0) })
             try await withSignalCancellation { () async throws(ElsewhereError) in
                 try await ElsewhereServer.serve(
                     store: options.store, environment: environment,
