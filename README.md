@@ -24,9 +24,10 @@ bypass the system tunnel that owns the default route.
 
 ## Status
 
-**M1 (fetch) feature-complete pending the live spikes** — this build has the config
-model, `exits`, `doctor`, `fetch`/`whoami`/`run` with Markdown rendering and paging;
-`serve` (MCP) is M2. The first tag, `0.1.0`, is cut when M2 lands; M1 has no tag.
+**M2 (serve) landed** — this build has the config model, `exits`, `doctor`,
+`fetch`/`whoami`/`run` with Markdown rendering and paging, and `elsewhere serve`, the
+MCP stdio server (below). The first tag, `0.1.0`, is cut when M2's PRs are merged and
+the registration recipes ship; M1 has no tag.
 
 ## Requirements
 
@@ -148,6 +149,25 @@ holds the secrets. Hand-editable; a redacted shape:
 | `ELSEWHERE_CONFIG` | Config path (the `--config` flag beats it). |
 | `ELSEWHERE_LINK` | A single `vless://…` link; synthesizes one in-memory exit named `env` and ignores the file entirely. |
 | `ELSEWHERE_XRAY_LOG` | Path for the engine's warnings; `--xray-log` beats it, silent is the default. |
+
+### MCP server (`elsewhere serve`)
+
+An agent calls the server over stdio — three tools, all read-only and idempotent:
+
+| Tool | Input | Output |
+|---|---|---|
+| `elsewhere_fetch` | `url` (required), `exit?`, `max_length?` (default 5000, at most 200000), `start_index?` (default 0), `raw?` (default false) | Four header lines — url, status, content-type, exit · elapsed — then the body as Markdown (`raw`: the decoded text without rendering), paged with the `<elsewhere:truncated …>` marker; HTTP ≥ 400 is a result, not an error |
+| `elsewhere_whoami` | `exit?` | `exit NAME: ip <ip> loc <loc>[ colo <colo>]` — every configured exit plus `direct` when `exit` is omitted |
+| `elsewhere_exits` | — | The `exits list` lines (credentials redacted) plus `direct` |
+
+The tunnel opens lazily on the first call that needs a route — one engine with every
+exit lane plus `direct` — and stops after `--idle-stop MIN` of no calls (default 10;
+`0` = never). Flags: `--allow-private` lifts the private-address guard for every
+call; `--via-system` unbinds the engine to the system path; `--log-tsv PATH` appends
+an audit row per call and per tunnel lifecycle edge; `--xray-log`/`ELSEWHERE_XRAY_LOG`
+redirect the engine log — serve's default is `~/Library/Logs/elsewhere/xray.log`,
+since stdout is the protocol. Registration recipes for agent hosts come with
+SETUP.md (the next PR).
 
 ## Exit status
 

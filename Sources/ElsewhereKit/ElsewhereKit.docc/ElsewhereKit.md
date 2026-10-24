@@ -1,7 +1,7 @@
 # ``ElsewhereKit``
 
 The façade behind `elsewhere`: the config file, named exits, the generated Xray config,
-and `doctor` — every surface (the CLI today, the MCP server at M2) shares it.
+and `doctor` — every surface (the CLI and the `ElsewhereMCP` server) shares it.
 
 ## Overview
 
