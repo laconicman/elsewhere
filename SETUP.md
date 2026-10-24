@@ -29,12 +29,14 @@ without re-copying:
 
 ```bash
 mkdir -p ~/.local/bin && ln -sf "$PWD/.build/release/elsewhere" ~/.local/bin/elsewhere
+command -v elsewhere || { echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && exec zsh; }
 ```
 
 No sudo. (`sudo ln -sf … /usr/local/bin/elsewhere` works too, if you'd rather a
-system path.) The symlink follows every release build in place;
-`swift package clean` breaks it until the next build. Keep the directory on
-PATH for your own CLI use — the hosts below get the absolute path anyway.
+system path — it is on PATH already.) The second line puts `~/.local/bin` on
+PATH when it isn't yet, so the `elsewhere` commands below resolve; the hosts in
+§4 get the absolute path anyway. The symlink follows every release build in
+place; `swift package clean` breaks it until the next build.
 
 ## 3. Configure an exit
 

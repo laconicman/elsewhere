@@ -40,6 +40,7 @@ git clone https://github.com/laconicman/elsewhere
 cd elsewhere
 swift build -c release
 mkdir -p ~/.local/bin && ln -sf "$PWD/.build/release/elsewhere" ~/.local/bin/elsewhere
+command -v elsewhere || { echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc && exec zsh; }
 ```
 
 The symlink follows every later release build; `/usr/local/bin` with `sudo` works too.
