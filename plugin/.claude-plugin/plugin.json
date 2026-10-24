@@ -1,0 +1,18 @@
+{
+  "name": "elsewhere",
+  "version": "0.1.0",
+  "description": "Fetch it from elsewhere: read URLs your network cannot reach through your own VLESS/Xray tunnel exits or a genuinely direct path — three read-only MCP tools plus the 'try Elsewhere first' skill. Requires the elsewhere binary on PATH: see https://github.com/laconicman/elsewhere/blob/main/SETUP.md",
+  "author": {
+    "name": "laconicman"
+  },
+  "homepage": "https://github.com/laconicman/elsewhere",
+  "license": "Apache-2.0",
+  "keywords": [
+    "elsewhere",
+    "mcp",
+    "fetch",
+    "vless",
+    "xray",
+    "tunnel"
+  ]
+}

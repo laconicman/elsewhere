@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "elsewhere": {
+      "type": "stdio",
+      "command": "elsewhere",
+      "args": [
+        "serve"
+      ]
+    }
+  }
+}

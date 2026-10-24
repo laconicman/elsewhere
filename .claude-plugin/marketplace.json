@@ -1,0 +1,13 @@
+{
+  "name": "laconicman",
+  "owner": {
+    "name": "laconicman"
+  },
+  "plugins": [
+    {
+      "name": "elsewhere",
+      "source": "./plugin",
+      "description": "Read URLs your network cannot reach through your own VLESS/Xray tunnel exits or a genuinely direct path — three read-only MCP tools plus the 'try Elsewhere first' skill. Requires the elsewhere binary on PATH (see the repo SETUP.md)."
+    }
+  ]
+}
