@@ -55,16 +55,17 @@ extension ToolSpec {
             do throws(ElsewhereError) {
                 let trace = try await WhoAmI.trace(
                     via: lease.session.route(for: name), userAgent: userAgent,
+                    traceURLs: context.traceURLs,
                     allowPrivate: context.options.allowPrivate)
                 context.tsv?.log(
                     event: "whoami", exit: name, status: "200",
-                    url: WhoAmI.defaultTraceURLs[0].absoluteString)
+                    url: context.traceURLs.first?.absoluteString ?? "-")
                 return line(name, trace)
             } catch {
                 // `trace` falls back URL to URL — the last tried is the error's.
                 context.tsv?.log(
                     event: "whoami", exit: name,
-                    url: WhoAmI.defaultTraceURLs.last?.absoluteString ?? "-")
+                    url: context.traceURLs.last?.absoluteString ?? "-")
                 throw error
             }
         }
@@ -78,6 +79,7 @@ extension ToolSpec {
                         let trace = try await WhoAmI.trace(
                             via: lease.session.route(for: name),
                             userAgent: userAgent,
+                            traceURLs: context.traceURLs,
                             allowPrivate: context.options.allowPrivate)
                         return (name, .success(trace))
                     } catch {
@@ -95,12 +97,12 @@ extension ToolSpec {
             case .success(let trace):
                 context.tsv?.log(
                     event: "whoami", exit: name, status: "200",
-                    url: WhoAmI.defaultTraceURLs[0].absoluteString)
+                    url: context.traceURLs.first?.absoluteString ?? "-")
                 lines.append(line(name, trace))
             case .failure(let error):
                 context.tsv?.log(
                     event: "whoami", exit: name,
-                    url: WhoAmI.defaultTraceURLs.last?.absoluteString ?? "-")
+                    url: context.traceURLs.last?.absoluteString ?? "-")
                 lines.append(
                     "exit \(name): "
                         + Redactor.scrubPatterns(error.localizedDescription))
