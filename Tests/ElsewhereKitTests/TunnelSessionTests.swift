@@ -71,7 +71,8 @@ struct TunnelSessionTests {
         do {
             _ = try await exitOnly.route(for: "direct")
             Issue.record("a moldova-only session routed 'direct'")
-        } catch is ElsewhereError {
+        } catch {
+            // route(for:) throws(ElsewhereError) — any catch is the failure wanted
         }
         await exitOnly.close()
 
@@ -85,7 +86,8 @@ struct TunnelSessionTests {
         do {
             _ = try await directOnly.route(for: "moldova")
             Issue.record("a direct-only session routed 'moldova'")
-        } catch is ElsewhereError {
+        } catch {
+            // route(for:) throws(ElsewhereError) — any catch is the failure wanted
         }
         await directOnly.close()
     }
