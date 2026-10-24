@@ -128,4 +128,17 @@ struct ServerTests {
             #expect(!reply.text.contains(secret))
         }
     }
+
+    /// The `direct` line reports the path the engine will actually ride: under
+    /// `--via-system` a file's `.auto` binding is moot — the reply says unbound.
+    @Test func exitsReportsTheEffectiveDirectPath() async throws {
+        let store = try store(ElsewhereConfig()) // bindInterface .auto
+        let context = ServeContext.makeNeverOpening(
+            store: store, options: ServeOptions(idleStop: nil, viaSystem: true))
+        let toolbox = Toolbox(specs: [.exits(context)])
+        let reply = try await toolbox.reply("elsewhere_exits")
+        #expect(!reply.isError)
+        #expect(
+            reply.text.contains("unbound — the system path"), "\(reply.text)")
+    }
 }

@@ -45,8 +45,11 @@ extension ServeContext {
     }
 
     /// For specs that must never reach the engine: the seam throws instead.
-    static func makeNeverOpening(store: ConfigStore) -> ServeContext {
-        make(store: store) { _, _, _ throws(ElsewhereError) -> TunnelSession in
+    static func makeNeverOpening(
+        store: ConfigStore, options: ServeOptions = ServeOptions(idleStop: nil)
+    ) -> ServeContext {
+        make(store: store, options: options) {
+            _, _, _ throws(ElsewhereError) -> TunnelSession in
             throw .tunnel("the test seam never opens")
         }
     }

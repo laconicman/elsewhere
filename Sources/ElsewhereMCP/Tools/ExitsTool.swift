@@ -27,7 +27,7 @@ extension ToolSpec {
             let config = try context.store.load(environment: context.environment)
             var lines = ExitsListing.lines(for: config)
             let direct: String
-            switch config.bindInterface {
+            switch context.options.bindInterface(for: config) {
             case .auto:
                 direct = "direct  the machine's own path (bound to the first physical interface — auto)"
             case .named(let name):
