@@ -1,0 +1,55 @@
+{
+  "manifest_version": "0.3",
+  "name": "elsewhere",
+  "display_name": "Elsewhere",
+  "version": "0.1.0",
+  "description": "Fetch it from elsewhere — read URLs through your own VLESS/Xray tunnel exits or a genuinely direct path, as MCP tools.",
+  "long_description": "Three read-only MCP tools — elsewhere_fetch, elsewhere_whoami, elsewhere_exits — that read URLs through named tunnel exits or the machine's own path past any system VPN, so an unreachable page is read, not guessed.\n\nIMPORTANT — this bundle does NOT contain the `elsewhere` binary. A compiled Swift binary is per-architecture, and a copy frozen into Desktop's extension folder would be invisible to your other MCP hosts and stale the moment you rebuild — so the bundle instead points at an `elsewhere` executable you build once from source (`swift build -c release` in the elsewhere repo) and place on a stable path. One binary then serves every host on the machine and stays current with each release build. Set the path below; see the repo SETUP.md if you don't have it yet.",
+  "author": {
+    "name": "laconicman",
+    "url": "https://github.com/laconicman/elsewhere"
+  },
+  "homepage": "https://github.com/laconicman/elsewhere",
+  "documentation": "https://github.com/laconicman/elsewhere/blob/main/SETUP.md",
+  "license": "Apache-2.0",
+  "keywords": ["elsewhere", "mcp", "fetch", "vless", "xray", "tunnel"],
+  "server": {
+    "type": "binary",
+    "entry_point": "${user_config.binary_path}",
+    "mcp_config": {
+      "command": "${user_config.binary_path}",
+      "args": ["serve", "--idle-stop", "${user_config.idle_stop}"],
+      "env": {
+        "ELSEWHERE_XRAY_LOG": "${user_config.xray_log}"
+      }
+    }
+  },
+  "tools_generated": true,
+  "user_config": {
+    "binary_path": {
+      "type": "file",
+      "title": "elsewhere binary",
+      "description": "Absolute path to the elsewhere executable. NOT bundled: build it with `swift build -c release` in the elsewhere repo and symlink it to a stable path so every rebuild stays in sync. See the repo SETUP.md.",
+      "required": true,
+      "default": "${HOME}/.local/bin/elsewhere"
+    },
+    "idle_stop": {
+      "type": "number",
+      "title": "Idle stop (minutes)",
+      "description": "0 = never stop the engine",
+      "required": false,
+      "default": 10,
+      "min": 0
+    },
+    "xray_log": {
+      "type": "file",
+      "title": "Engine log (optional)",
+      "description": "Engine warnings file; empty = ~/Library/Logs/elsewhere/xray.log",
+      "required": false,
+      "default": ""
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin"]
+  }
+}
