@@ -7,13 +7,16 @@
 ///
 /// `maxLength <= 0` means unlimited. `startIndex` past the end returns the marker
 /// alone — `next_start_index` = total, so "there is nothing more" is readable,
-/// not an error.
+/// not an error. An empty text at start 0 is empty output; a start past the end
+/// (an empty text included) is the marker alone.
 public enum Pager {
     /// - Returns: the slice, plus a `\n<elsewhere:truncated …>` marker when a
     ///   remainder was cut off.
     public static func slice(_ text: String, startIndex: Int, maxLength: Int) -> String {
         let total = text.count // Characters — the unit the contract is in
         let start = Swift.max(0, startIndex)
+        // An empty text at start 0: nothing was cut and nothing skipped.
+        if total == 0, start == 0 { return "" }
         guard start < total else {
             return "<elsewhere:truncated next_start_index=\(total) total=\(total)>\n"
         }

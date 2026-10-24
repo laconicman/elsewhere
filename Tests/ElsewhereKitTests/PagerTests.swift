@@ -35,6 +35,19 @@ struct PagerTests {
             == "<elsewhere:truncated next_start_index=2 total=2>\n")
     }
 
+    /// A 204/empty body at start 0 pages to nothing — no marker for a cut that
+    /// never happened.
+    @Test func anEmptyTextAtStartZeroIsEmpty() {
+        #expect(Pager.slice("", startIndex: 0, maxLength: 0) == "")
+        #expect(Pager.slice("", startIndex: 0, maxLength: 5) == "")
+    }
+
+    /// Past the end is still the marker alone — an empty text included.
+    @Test func anEmptyTextPastTheStartIsTheMarker() {
+        #expect(Pager.slice("", startIndex: 3, maxLength: 0)
+            == "<elsewhere:truncated next_start_index=0 total=0>\n")
+    }
+
     @Test func negativeStartClampsToZero() {
         #expect(Pager.slice("hello", startIndex: -3, maxLength: 2)
             == "he\n<elsewhere:truncated next_start_index=2 total=5>\n")
