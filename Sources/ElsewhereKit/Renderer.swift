@@ -18,7 +18,8 @@ import SwiftSoup // the parser — never in the public surface (rule 1)
 /// hurts readability more than the occasional literal `#` helps a stray renderer —
 /// only a line that would otherwise open a block (heading, bullet, quote,
 /// numbered marker, fence, rule, HTML opener or link reference definition),
-/// `|` in table cells, and `[`/`]` inside a link label get a backslash.
+/// `|` in table cells, and `[`/`]` — and a backslash — inside a link or image
+/// label get a backslash.
 public enum Renderer {
     /// Under this rendered body length a shell's markup is a symptom, not content.
     static let jsShellThreshold = 200
@@ -474,8 +475,11 @@ extension Renderer {
 
     /// `[`/`]` in text destined for a link or image label escape; the label is
     /// the only context where a bare bracket opens markup the author never wrote.
+    /// A backslash itself doubles first, so an author's backslash never pairs
+    /// with the one we add.
     private static func escapeBrackets(_ text: String) -> String {
-        text.replacingOccurrences(of: "[", with: "\\[")
+        text.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "[", with: "\\[")
             .replacingOccurrences(of: "]", with: "\\]")
     }
 

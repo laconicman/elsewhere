@@ -296,6 +296,26 @@ struct RendererTests {
         #expect(plain.contains("a]b"))
     }
 
+    /// An author's backslash doubles BEFORE the bracket escape — `a\]b` is a
+    /// literal backslash plus a literal `]`; unescaped, the `]` would close the
+    /// label behind the `\\`. Alt text and link text alike.
+    @Test func backslashesInLabelsDoubleBeforeTheBracketEscape() {
+        let img = #"<body><p><img alt="a\]b" src="https://example.com/i.png"></p></body>"#
+        let link = #"<body><p><a href="https://example.com/x">a\]b</a></p></body>"#
+        let url = URL(string: "https://example.com")!
+        let renderedImg = Renderer.render(
+            img, contentType: "text/html", finalURL: url, format: .markdown)
+        #expect(renderedImg.contains(#"![a\\\]b](https://example.com/i.png)"#))
+        let renderedLink = Renderer.render(
+            link, contentType: "text/html", finalURL: url, format: .markdown)
+        #expect(renderedLink.contains(#"[a\\\]b](https://example.com/x)"#))
+        for html in [img, link] {
+            let plain = Renderer.render(
+                html, contentType: "text/html", finalURL: url, format: .text)
+            #expect(plain.contains(#"a\]b"#))
+        }
+    }
+
     /// A container whose children are text and inline elements without a wrapping
     /// `<p>` is ONE paragraph — the link survives and the words stay together
     /// (the layout-lines defect: they used to split into separate blocks).

@@ -163,8 +163,9 @@ over **SwiftSoup**, the long-lived jsoup port already trusted for parsing, and
 the block/inline rules are ours to tune (TD-6). The reader is a language model,
 which shapes two decisions. **Escaping is minimal:** only a line that would
 open a block — heading, bullet, quote, numbered marker, fence, rule, HTML
-opener or link reference definition — `|` in table cells, and `[`/`]` inside a
-link label get a backslash; an inline element's edge whitespace moves outside
+opener or link reference definition — `|` in table cells, and `[`/`]` — and a
+backslash — inside a link or image label get a backslash; an inline element's
+edge whitespace moves outside
 its delimiters. Over-escaping hurts an agent's readability more than the rare
 literal marker it prevents. **The JavaScript-shell note is honest:** when a page carried
 `script[src]`s but renders under 200 characters, `fetch` appends
