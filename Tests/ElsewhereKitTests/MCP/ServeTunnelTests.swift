@@ -145,6 +145,71 @@ struct ServeTunnelTests {
         #expect(opens.value == 1) // refused before `open` ran again
     }
 
+    /// An edited exit — same name, new endpoint — is a routing change too: the
+    /// session reopens so the engine doesn't keep the old route.
+    @Test func anEditedExitReopensTheSession() async throws {
+        let opens = Opens()
+        let store = try store()
+        let tunnel = tunnel(
+            store: store, options: ServeOptions(idleStop: nil), opens: opens)
+        let first = try await tunnel.lease()
+        _ = first
+        await tunnel.release()
+        try store.save(ElsewhereConfig(exits: [
+            "p": .proxy(URL(string: "http://127.0.0.1:2")!),
+        ]))
+        let second = try await tunnel.lease()
+        #expect(opens.value == 2)
+        let route = try await second.session.route(for: "p")
+        #expect(
+            route == .external(
+                exit: "p", url: URL(string: "http://127.0.0.1:2")!))
+        await tunnel.release()
+        await tunnel.close(reason: "eof")
+    }
+
+    /// The bind interface is routing too: a file change to it reopens — unless
+    /// `--via-system` already unbound the engine, which makes the file's value
+    /// moot.
+    @Test func aChangedBindInterfaceReopensUnlessViaSystem() async throws {
+        let opens = Opens()
+        let store = try store() // bindInterface .auto
+        let bound = tunnel(
+            store: store, options: ServeOptions(idleStop: nil), opens: opens)
+        let first = try await bound.lease()
+        _ = first
+        await bound.release()
+        try store.save(ElsewhereConfig(
+            bindInterface: .none,
+            exits: ["p": .proxy(URL(string: "http://127.0.0.1:1")!)]))
+        let second = try await bound.lease()
+        _ = second
+        #expect(opens.value == 2)
+        await bound.release()
+        await bound.close(reason: "eof")
+
+        // Under --via-system the engine already rides the system path: the
+        // same .auto → .none edit changes nothing it binds to.
+        let systemOpens = Opens()
+        try store.save(ElsewhereConfig(exits: [
+            "p": .proxy(URL(string: "http://127.0.0.1:1")!),
+        ]))
+        let systemTunnel = tunnel(
+            store: store, options: ServeOptions(idleStop: nil, viaSystem: true),
+            opens: systemOpens)
+        let third = try await systemTunnel.lease()
+        _ = third
+        await systemTunnel.release()
+        try store.save(ElsewhereConfig(
+            bindInterface: .none,
+            exits: ["p": .proxy(URL(string: "http://127.0.0.1:1")!)]))
+        let fourth = try await systemTunnel.lease()
+        _ = fourth
+        #expect(systemOpens.value == 1)
+        await systemTunnel.release()
+        await systemTunnel.close(reason: "eof")
+    }
+
     /// The config is re-read per call: exits added between leases reopen the
     /// session when nothing is in flight.
     @Test func aChangedExitSetReopensTheSession() async throws {

@@ -34,4 +34,10 @@ public struct ServeOptions: Sendable {
         self.log = log
         self.tsvLog = tsvLog
     }
+
+    /// The interface the engine binds under these options — `--via-system`
+    /// unbinds whatever the file says.
+    public func bindInterface(for config: ElsewhereConfig) -> BindInterface {
+        viaSystem ? .none : config.bindInterface
+    }
 }

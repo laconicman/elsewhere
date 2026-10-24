@@ -13,8 +13,8 @@ struct ServeCommand: AsyncParsableCommand {
         The tunnel opens lazily on the first call that needs a route — one engine \
         with every exit lane plus `direct`, so switching exits never restarts it — \
         and stops after --idle-stop minutes of no calls (0 = never). A changed exit \
-        set reopens on the next call. stdout is the protocol; the engine log \
-        defaults to ~/Library/Logs/elsewhere/xray.log (--xray-log or \
+        or bind interface reopens on the next call. stdout is the protocol; the \
+        engine log defaults to ~/Library/Logs/elsewhere/xray.log (--xray-log or \
         ELSEWHERE_XRAY_LOG overrides), and --log-tsv keeps an audit row per call \
         and per lifecycle edge.
         """

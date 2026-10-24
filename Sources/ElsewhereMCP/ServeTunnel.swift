@@ -8,9 +8,10 @@ import Foundation
 /// and `release()`s it when done; the idle clock runs from the last release.
 ///
 /// The config is re-read on every lease, so `exits add` lands without a
-/// restart: when the exit set changed and nothing is in flight the session is
-/// reopened; when a call is in flight the current session serves and an exit
-/// the file gained gets the Kit's `.exit` from `route(for:)`. A dead engine
+/// restart: when an exit changed — added, removed or edited — or the bind
+/// interface did, and nothing is in flight, the session is reopened; when a
+/// call is in flight the current session serves and an exit the file gained
+/// gets the Kit's `.exit` from `route(for:)`. A dead engine
 /// (`isAlive` false) reopens the same way. A failed start backs off 1 s
 /// doubling to 30 s — a call inside the window is refused without a new
 /// attempt.
@@ -32,8 +33,20 @@ actor ServeTunnel {
         ElsewhereConfig, BindInterface, XrayConfigBuilder.XrayLog
     ) async throws(ElsewhereError) -> TunnelSession
 
+    /// What decides the engine's routes — the exits and the interface they bind
+    /// to. A change here on disk reopens the session; `default` and `userAgent`
+    /// are read per call from the lease's config and need none.
+    private struct Routing: Equatable {
+        let exits: [String: Exit]
+        let bindInterface: BindInterface
+        init(_ config: ElsewhereConfig, options: ServeOptions) {
+            exits = config.exits
+            bindInterface = options.bindInterface(for: config)
+        }
+    }
+
     private var session: TunnelSession?
-    private var sessionExits: Set<String> = []
+    private var sessionRouting: Routing?
     /// The in-flight `open`, if any — actors reenter across an `await`, so a
     /// second `lease` during a start must share the attempt, not start its own
     /// (the engine is one Go runtime: two opens collide — "already in use").
@@ -76,22 +89,22 @@ actor ServeTunnel {
             throw .tunnel(
                 "the tunnel is backing off after a failed start; try again shortly")
         }
-        let names = Set(config.exits.keys)
+        let routing = Routing(config, options: options)
         let held: TunnelSession
         if let current = session {
             // (`||`'s right side can't hold an await — the liveness ask is staged.)
             let dead = !(await current.isAlive)
-            let stale = names != sessionExits || dead
+            let stale = routing != sessionRouting || dead
             if stale, inFlight == 0 {
-                // A changed exit set or a dead engine: reopen — lanes follow the file.
+                // A changed route set or a dead engine: reopen — lanes follow the file.
                 await close(reason: "reopen")
-                held = try await start(config, names: names)
+                held = try await start(config, routing: routing)
             } else {
                 // In flight (or unchanged), the current session serves as is.
                 held = current
             }
         } else {
-            held = try await start(config, names: names)
+            held = try await start(config, routing: routing)
         }
         inFlight += 1
         idleTask?.cancel()
@@ -114,7 +127,7 @@ actor ServeTunnel {
         generation += 1
         var held = session
         session = nil
-        sessionExits = []
+        sessionRouting = nil
         if let pending = startTask {
             if case .success(let opened) = await pending.value { held = opened }
             startTask = nil
@@ -130,7 +143,7 @@ actor ServeTunnel {
     /// runs awaits the same `startTask` and shares its outcome — success or
     /// failure — without a second `open` or a second arm.
     private func start(
-        _ config: ElsewhereConfig, names: Set<String>
+        _ config: ElsewhereConfig, routing: Routing
     ) async throws(ElsewhereError) -> TunnelSession {
         if let pending = startTask {
             let gen = generation
@@ -148,8 +161,7 @@ actor ServeTunnel {
         let attempt = Task<Result<TunnelSession, ElsewhereError>, Never> {
             do throws(ElsewhereError) {
                 return .success(try await open(
-                    config, options.viaSystem ? .none : config.bindInterface,
-                    options.log))
+                    config, routing.bindInterface, options.log))
             } catch {
                 return .failure(error)
             }
@@ -165,10 +177,10 @@ actor ServeTunnel {
                 throw .tunnel("the tunnel closed while it was starting")
             }
             session = opened
-            sessionExits = names
+            sessionRouting = routing
             backoff = .seconds(1)
             backoffUntil = nil
-            tsv?.log(event: "up", exit: "\(names.count + 1)")
+            tsv?.log(event: "up", exit: "\(routing.exits.count + 1)")
             return opened
         case .failure(let error):
             startTask = nil

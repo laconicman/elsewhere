@@ -268,7 +268,8 @@ one, on PR #4).
 first call that needs a route — with every Xray lane *and* `direct`, so switching exits
 never restarts the core. Where the CLI opens only the lanes a call needs (A9), a server
 pays one Go start and reuses it across calls and exits. The config is re-read per call:
-when the exit set changed and nothing is in flight, the session is reopened on that
+when an exit changed — added, removed or edited — or the bind interface did, and
+nothing is in flight, the session is reopened on that
 call; while a call runs, the current session serves and a name the file just gained
 gets the Kit's `.exit` — the next call picks it up. A dead engine (``TunnelSession/isAlive``
 false) reopens the same way, and a failed start backs off 1 s doubling to 30 s — a call
