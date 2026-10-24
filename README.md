@@ -24,9 +24,9 @@ bypass the system tunnel that owns the default route.
 
 ## Status
 
-**M1 (fetch) in progress** — this build has the config model, `exits`, `doctor`, and
-`fetch`/`whoami`/`run`; Markdown rendering lands with the next PR, `serve` (MCP) with
-M2. The first tag, `0.1.0`, is cut when M2 (`serve`) lands; M1 has no tag.
+**M1 (fetch) feature-complete pending the live spikes** — this build has the config
+model, `exits`, `doctor`, `fetch`/`whoami`/`run` with Markdown rendering and paging;
+`serve` (MCP) is M2. The first tag, `0.1.0`, is cut when M2 lands; M1 has no tag.
 
 ## Requirements
 
@@ -81,6 +81,30 @@ trickles a byte at a time still hits it — a 5 MB body cap, and a Chrome User-A
 the status is data the agent reads. Private/local destinations are refused unless
 `--allow-private` — the tool reaches everywhere the tunnel does, so a mistyped URL
 must never be the way something reads a LAN or link-local address.
+
+### Output: Markdown, text, raw — and paging
+
+`fetch --format markdown` (the default) renders HTML to Markdown: a `# <title>`
+heading when the page has one, the `<main>`/`article`/`[role=main]` region (nav,
+headers, footers, scripts, hidden elements are gone), and a `Source: <final URL>`
+footer. `--format text` runs the same pipeline without the markers — links become
+their text, images their alt text. `--format raw` writes the response **bytes**
+verbatim — no decode, render or paging (a 1251 page stays 1251); `--json` still
+carries the decoded text in `body`, since JSON cannot carry bytes. Anything
+that is not HTML — JSON, a `cdn-cgi/trace` body — passes through unchanged for
+every format. `--head` and `--output` ignore `--format`.
+
+`--max-length N` cuts the rendered text at N **characters** (0 = unlimited, the CLI
+default) and ends a cut page with
+`<elsewhere:truncated next_start_index=M total=T>`; `--start-index M` reads on from
+there. Cuts never split an emoji or a combining sequence — the unit is the
+`Character`, not the byte. Both flags reject negative values. Paging applies to
+rendered text; raw is the bytes.
+
+Known limitation: a JavaScript SPA's HTML shell carries little content — when a
+page had external scripts but renders under 200 characters, `fetch` appends
+`_Note: this page appears to be rendered by JavaScript; the HTML shell carried
+little content._` rather than pretending the shell was the page.
 
 `--via-system` unbinds the engine's outbound sockets so they ride the system path —
 the system VPN when one is up. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) writes the

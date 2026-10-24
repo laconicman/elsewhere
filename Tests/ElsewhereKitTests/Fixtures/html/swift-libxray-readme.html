@@ -1,0 +1,156 @@
+<!doctype html><html><head><title>laconicman/swift-libxray — GitHub</title></head><body><article class="markdown-body entry-content container-lg" itemprop="text"><div class="markdown-heading" dir="auto"><h1 tabindex="-1" class="heading-element" dir="auto">swift-libxray</h1><a id="user-content-swift-libxray" class="anchor" aria-label="Permalink: swift-libxray" href="#swift-libxray"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+
+<p dir="auto"><a href="https://github.com/laconicman/swift-libxray/actions/workflows/ci.yml"><img src="https://github.com/laconicman/swift-libxray/actions/workflows/ci.yml/badge.svg" alt="CI" style="max-width: 100%;"></a>
+<a href="/laconicman/swift-libxray/blob/main/LICENSE.txt"><img src="https://camo.githubusercontent.com/f60cb0de87bbb87501d20c4fb0c9730ffee1dc4499e9ce303d477ffe8925f98b/68747470733a2f2f696d672e736869656c64732e696f2f62616467652f6c6963656e73652d4170616368655f322e302d626c75652e737667" alt="License: Apache 2.0" data-canonical-src="https://img.shields.io/badge/license-Apache_2.0-blue.svg" style="max-width: 100%;"></a></p>
+
+<p dir="auto">Xray-core for Swift: the <strong>official</strong> <a href="https://github.com/XTLS/libXray">XTLS/libXray</a> Apple
+cgo build (<code>LibXray.xcframework</code>, static, unpatched) as a SwiftPM binary target, plus
+<code>XrayCore</code>, a typed actor façade over its <code>CGoInvoke</code> JSON API.</p>
+<ul dir="auto">
+<li><strong>Official, unpatched, static.</strong> The artifact is exactly what <code>XTLS/libXray</code> releases for
+Apple platforms — <code>go build -buildmode=c-archive</code>, lipo'd per SDK — re-zipped only so the
+xcframework sits at the archive root (the layout SwiftPM's <code>binaryTarget</code> wants). One Go
+runtime per process, one exported symbol pair: <code>CGoInvoke</code> / <code>CGoFree</code>.</li>
+<li><strong>Why not dima-u's wrappers.</strong> <code>dima-u/SwiftyXrayCore</code> 1.1.0 (2025-12-26) bundles Xray
+25.10.15 with Outline's tun2socks in one gomobile framework; <code>dima-u/SwiftyXrayKit</code> 2.0.0
+(2026-05-13) depends on <code>dima-u/libXray-apple</code> at <code>v26.3.27-ios</code>, a fork built on a
+patched Xray-core (<code>dima-u/Xray-core-apple</code>) so the TUN inbound works over a
+<code>SOCK_STREAM</code> socketpair inside the iOS Network Extension sandbox. Both exist to solve
+the packet-tunnel problem; this package has none and tracks the unmodified upstream —
+what Xray upstream ships is what runs.</li>
+</ul>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">Install</h2><a id="user-content-install" class="anchor" aria-label="Permalink: Install" href="#install"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<div class="highlight highlight-source-swift notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="dependencies: [
+    .package(url: &quot;https://github.com/laconicman/swift-libxray&quot;, from: &quot;0.1.0&quot;),
+],"><pre><span class="pl-ent">dependencies:</span> <span class="pl-kos">[</span>
+    <span class="pl-kos">.</span><span class="pl-k">package</span><span class="pl-kos">(</span>url<span class="pl-kos">:</span> <span class="pl-s">"</span><span class="pl-s">https://github.com/laconicman/swift-libxray</span><span class="pl-s">"</span><span class="pl-kos">,</span> from<span class="pl-kos">:</span> <span class="pl-s">"</span><span class="pl-s">0.1.0</span><span class="pl-s">"</span><span class="pl-kos">)</span><span class="pl-kos">,</span>
+<span class="pl-kos">]</span><span class="pl-kos">,</span></pre></div>
+<p dir="auto">and depend on the <code>XrayCore</code> product. Platforms: macOS 13, iOS 15 — the artifact's own
+floors, read off its <code>LC_BUILD_VERSION</code>s (the xcframework also ships tvOS slices; they are
+simply undeclared here).</p>
+<p dir="auto">Toolchain: Swift 6.4 (Xcode 27). The manifest's <code>swift-tools-version</code> is 6.4; Xcode
+26.6's SwiftPM (Swift 6.3.3) cannot parse it, so the package does not resolve there.</p>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">Usage</h2><a id="user-content-usage" class="anchor" aria-label="Permalink: Usage" href="#usage"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<p dir="auto">All calls go through one actor — the Go runtime is process-global, so <code>XrayCore.shared</code> is
+its only door:</p>
+<div class="highlight highlight-source-swift notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="import XrayCore
+
+let core = XrayCore.shared
+
+try await core.version()                          // &quot;26.10.21&quot; — what the artifact really is
+let ports = try await core.freePorts(3, excluding: [10808])
+
+let outbounds = try await core.convertShareLinks(links)  // {&quot;outbounds&quot;:[…]} as Data
+let config = &quot;&quot;&quot;
+    {&quot;log&quot;:{&quot;access&quot;:&quot;none&quot;,&quot;loglevel&quot;:&quot;warning&quot;},
+     &quot;inbounds&quot;:[{&quot;tag&quot;:&quot;in&quot;,&quot;listen&quot;:&quot;127.0.0.1&quot;,&quot;port&quot;:\(ports[0]),
+                  &quot;protocol&quot;:&quot;mixed&quot;,&quot;settings&quot;:{&quot;udp&quot;:false}}],
+     &quot;outbounds&quot;:[…spliced from `outbounds`…]}
+    &quot;&quot;&quot;
+try await core.test(configJSON: config)           // build-check only; no network
+try await core.run(configJSON: config)            // returns before the inbounds accept!
+await core.isRunning                              // getXrayState → data.running
+try await core.stop()                             // restart in the same process works"><pre><span class="pl-k">import</span> XrayCore
+
+<span class="pl-k">let</span> <span class="pl-s1">core</span> <span class="pl-c1">=</span> <span class="pl-smi">XrayCore</span><span class="pl-kos">.</span>shared
+
+<span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">version</span><span class="pl-kos">(</span><span class="pl-kos">)</span>                          // "26.10.21" — what the artifact really is
+<span class="pl-k">let</span> <span class="pl-s1">ports</span> <span class="pl-c1">=</span> <span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">freePorts</span><span class="pl-kos">(</span><span class="pl-c1">3</span><span class="pl-kos">,</span> excluding<span class="pl-kos">:</span> <span class="pl-kos">[</span><span class="pl-c1">10808</span><span class="pl-kos">]</span><span class="pl-kos">)</span>
+
+<span class="pl-k">let</span> <span class="pl-s1">outbounds</span> <span class="pl-c1">=</span> <span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">convertShareLinks</span><span class="pl-kos">(</span>links<span class="pl-kos">)</span>  // {"outbounds":[…]} as Data
+<span class="pl-k">let</span> <span class="pl-s1">config</span> <span class="pl-c1">=</span> <span class="pl-s">"""</span><span class="pl-s"></span>
+<span class="pl-s">    {</span><span class="pl-s">"</span><span class="pl-s">log</span><span class="pl-s">"</span><span class="pl-s">:{</span><span class="pl-s">"</span><span class="pl-s">access</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-s">"</span><span class="pl-s">none</span><span class="pl-s">"</span><span class="pl-s">,</span><span class="pl-s">"</span><span class="pl-s">loglevel</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-s">"</span><span class="pl-s">warning</span><span class="pl-s">"</span><span class="pl-s">},</span>
+<span class="pl-s">     </span><span class="pl-s">"</span><span class="pl-s">inbounds</span><span class="pl-s">"</span><span class="pl-s">:[{</span><span class="pl-s">"</span><span class="pl-s">tag</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-s">"</span><span class="pl-s">in</span><span class="pl-s">"</span><span class="pl-s">,</span><span class="pl-s">"</span><span class="pl-s">listen</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-s">"</span><span class="pl-s">127.0.0.1</span><span class="pl-s">"</span><span class="pl-s">,</span><span class="pl-s">"</span><span class="pl-s">port</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-kos">\(</span><span class="pl-en">ports</span><span class="pl-kos">[</span><span class="pl-c1">0</span><span class="pl-kos">]</span><span class="pl-kos">)</span><span class="pl-s">,</span>
+<span class="pl-s">                  </span><span class="pl-s">"</span><span class="pl-s">protocol</span><span class="pl-s">"</span><span class="pl-s">:</span><span class="pl-s">"</span><span class="pl-s">mixed</span><span class="pl-s">"</span><span class="pl-s">,</span><span class="pl-s">"</span><span class="pl-s">settings</span><span class="pl-s">"</span><span class="pl-s">:{</span><span class="pl-s">"</span><span class="pl-s">udp</span><span class="pl-s">"</span><span class="pl-s">:false}}],</span>
+<span class="pl-s">     </span><span class="pl-s">"</span><span class="pl-s">outbounds</span><span class="pl-s">"</span><span class="pl-s">:[…spliced from `outbounds`…]}</span>
+<span class="pl-s">    </span><span class="pl-s">"""</span>
+<span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">test</span><span class="pl-kos">(</span>configJSON<span class="pl-kos">:</span> config<span class="pl-kos">)</span>           // build-check only; no network
+<span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">run</span><span class="pl-kos">(</span>configJSON<span class="pl-kos">:</span> config<span class="pl-kos">)</span>            // returns before the inbounds accept!
+<span class="pl-k">await</span> core<span class="pl-kos">.</span>isRunning                              // getXrayState → data.running
+<span class="pl-c1"><span class="pl-k">try</span></span> <span class="pl-k">await</span> core<span class="pl-kos">.</span><span class="pl-en">stop</span><span class="pl-kos">(</span><span class="pl-kos">)</span>                             // restart in the same process works</pre></div>
+<p dir="auto">Two behaviors to plan around (measured on macOS 26, Xray 26.10.21):</p>
+<ul dir="auto">
+<li><strong><code>run</code> returns before the inbounds accept</strong> — the call itself is ~1 ms while the core
+finishes starting ~350 ms later. <code>isRunning</code> flips true at once; probe the inbound socket
+before sending traffic.</li>
+<li><strong>Xray logs to stderr</strong>, not to the API: a start banner, then one <code>accepted</code> line per
+connection at the default <code>access</code> level. Set <code>"access":"none"</code> (and <code>"loglevel"</code>) in the
+config's <code>log</code> block if stderr is yours.</li>
+<li><code>convertShareLinks</code> returns the engine's <strong>flat</strong> outbound shape —
+<code>settings:{address,port,id,encryption}</code> (no <code>vnext</code>/<code>users</code>), <code>pbk</code> →
+<code>realitySettings.password</code>, <code>#fragment</code> → <code>tag</code>. It is the format this core accepts.</li>
+</ul>
+<p dir="auto">Errors are typed: <code>XrayError</code> carries <code>method</code>, <code>stage</code> (<code>encode</code> / <code>invoke</code> / <code>decode</code>)
+and the engine's message verbatim.</p>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">Provenance</h2><a id="user-content-provenance" class="anchor" aria-label="Permalink: Provenance" href="#provenance"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<p dir="auto">Recorded in <a href="/laconicman/swift-libxray/blob/main/Upstream/v26.10.21.json"><code>Upstream/v26.10.21.json</code></a> by
+<code>libxray-asset-tool</code>; upstream publishes no checksums, so this record is the provenance.</p>
+<markdown-accessiblity-table><table>
+<thead>
+<tr>
+<th></th>
+<th></th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Upstream</td>
+<td><code>https://github.com/XTLS/libXray/releases/download/v26.10.21/libxray-apple-cgo.zip</code></td>
+</tr>
+<tr>
+<td>Upstream SHA-256</td>
+<td><code>f318d216bb3b16b18d7b04c54789d1feaa6b7571433ed5582c1fe776e3776ef1</code></td>
+</tr>
+<tr>
+<td>Upstream bytes</td>
+<td>101,519,579</td>
+</tr>
+<tr>
+<td>Asset</td>
+<td><code>LibXray-v26.10.21.xcframework.zip</code> on the <code>libxray-v26.10.21</code> release</td>
+</tr>
+<tr>
+<td>Asset SHA-256 (SwiftPM checksum)</td>
+<td><code>c8827e11c5debb005e07510e7450bed399fab93b4dba5c24747b2f1864dfedc0</code></td>
+</tr>
+<tr>
+<td>Asset bytes</td>
+<td>101,517,039</td>
+</tr>
+<tr>
+<td>Slices</td>
+<td>macos-arm64_x86_64 · ios-arm64 · ios-arm64_x86_64-simulator · tvos-arm64 · tvos-arm64_x86_64-simulator</td>
+</tr>
+<tr>
+<td>Floors (LC_BUILD_VERSION)</td>
+<td>macOS 13.0 · iOS 15.0 (tvOS slices exist, undeclared)</td>
+</tr>
+</tbody>
+</table></markdown-accessiblity-table>
+<p dir="auto">To verify by hand: download the upstream zip and <code>shasum -a 256</code> it against the row above;
+then download the asset from the release and <code>swift package compute-checksum</code> it against
+the checksum row. Do not expect a local re-zip to reproduce that checksum: <code>zip</code> stamps
+local time and traverses in filesystem order, so the bytes differ across machines while
+the extracted trees are identical (<code>diff -r</code> them if in doubt) — TD-3.</p>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">Versioning</h2><a id="user-content-versioning" class="anchor" aria-label="Permalink: Versioning" href="#versioning"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<p dir="auto">Two tag schemes share this repo:</p>
+<ul dir="auto">
+<li><strong><code>libxray-vX.Y.Z</code></strong> — engine <em>artifacts</em> (Releases holding the xcframework zip). They
+are not SwiftPM versions and are ignored by it.</li>
+<li><strong><code>0.x.y</code> (no <code>v</code>)</strong> — the package's own semver tags, per milestone.</li>
+</ul>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">For maintainers</h2><a id="user-content-for-maintainers" class="anchor" aria-label="Permalink: For maintainers" href="#for-maintainers"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<p dir="auto"><code>libxray-asset-tool</code> re-vendors the artifact:</p>
+<div class="highlight highlight-source-shell notranslate position-relative overflow-auto" dir="auto" data-snippet-clipboard-copy-content="swift run libxray-asset-tool v26.10.21"><pre>swift run libxray-asset-tool v26.10.21</pre></div>
+<p dir="auto">It downloads the upstream zip, hashes it, re-packs the xcframework into <code>Artifacts/</code>
+(git-ignored), records provenance into <code>Upstream/&lt;tag&gt;.json</code>, and prints the
+<code>.binaryTarget</code> snippet and the <code>gh release create</code> command. <code>url</code> and <code>checksum</code> in
+<code>Package.swift</code> always change together, and <code>Upstream/*.json</code> is never hand-edited.</p>
+<p dir="auto">The decisions and what each rejected are in the <strong>Design</strong> article of the DocC catalog
+(<code>Sources/XrayCore/XrayCore.docc/</code>), which is authoritative; the milestones are in
+<code>Roadmap.md</code> and the known compromises in <code>TechDebt.md</code> beside it.</p>
+<div class="markdown-heading" dir="auto"><h2 tabindex="-1" class="heading-element" dir="auto">License</h2><a id="user-content-license" class="anchor" aria-label="Permalink: License" href="#license"><svg data-component="Octicon" class="octicon octicon-link" viewBox="0 0 16 16" version="1.1" width="16" height="16" aria-hidden="true"><path d="m7.775 3.275 1.25-1.25a3.5 3.5 0 1 1 4.95 4.95l-2.5 2.5a3.5 3.5 0 0 1-4.95 0 .751.751 0 0 1 .018-1.042.751.751 0 0 1 1.042-.018 1.998 1.998 0 0 0 2.83 0l2.5-2.5a2.002 2.002 0 0 0-2.83-2.83l-1.25 1.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042Zm-4.69 9.64a1.998 1.998 0 0 0 2.83 0l1.25-1.25a.751.751 0 0 1 1.042.018.751.751 0 0 1 .018 1.042l-1.25 1.25a3.5 3.5 0 1 1-4.95-4.95l2.5-2.5a3.5 3.5 0 0 1 4.95 0 .751.751 0 0 1-.018 1.042.751.751 0 0 1-1.042.018 1.998 1.998 0 0 0-2.83 0l-2.5 2.5a1.998 1.998 0 0 0 0 2.83Z"></path></svg></a></div>
+<p dir="auto">Apache 2.0 — see <a href="/laconicman/swift-libxray/blob/main/LICENSE.txt">LICENSE.txt</a>. The <code>LibXray</code> artifact is XTLS/libXray's own
+build, redistributed unmodified: libXray under MIT, the Xray-core it embeds under MPL-2.0 —
+sources at the recorded upstream tag (<code>Upstream/v26.10.21.json</code>).</p>
+</article></body></html>

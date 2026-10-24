@@ -114,8 +114,8 @@ is the probe; `serve` may warm up at M2).
 a `sed`. Status lines, truncation and binary notices, and the `HTTP <status>` note go
 to stderr; `--json` replaces the body with the whole result object when a caller wants
 structure. Printed URLs — the JSON fields, the redirect list, the stderr note — keep
-scheme, host, path and query but never userinfo: where a request went is data, a
-credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
+scheme, host, path and query but never userinfo, and so do URL-shaped header values
+(`Location`, `Link`): where a request went is data, a credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
 the status is data
 the agent reads (§5.5). **Rejected:** stderr-and-no-body on errors (loses the page's
 own error body) and a JSON envelope by default (most calls want the page).
@@ -153,6 +153,50 @@ first, a `SIGKILL` five seconds later if it still stands — and the reaped stat
 (143/137) flows back like any other exit. **Rejected:** per-app routing machinery
 (pf, a transparent proxy) —
 heavier than the contract needs.
+
+## `Renderer` walks SwiftSoup's DOM; escaping stays minimal
+
+`fetch --format markdown` renders HTML to Markdown for the agent's eyes. The field
+of Swift HTML→Markdown libraries is tiny — the plan's survey (§3.7) found every
+candidate at ≤ 18★ and unmaintained — so the renderer is a hand-written walk
+over **SwiftSoup**, the long-lived jsoup port already trusted for parsing, and
+the block/inline rules are ours to tune (TD-6). The reader is a language model,
+which shapes two decisions. **Escaping is minimal:** only a line that would
+open a block — heading, bullet, quote, numbered marker, fence, rule, HTML
+opener or link reference definition — `|` in table cells, and `[`/`]` — and a
+backslash — inside a link or image label get a backslash; an inline element's
+edge whitespace moves outside
+its delimiters. Over-escaping hurts an agent's readability more than the rare
+literal marker it prevents. **The JavaScript-shell note is honest:** when a page carried
+`script[src]`s but renders under 200 characters, `fetch` appends
+`_Note: this page appears to be rendered by JavaScript; the HTML shell carried
+little content._` — a shell pretending to be content is worse than a named limit.
+**Links are allowlisted:** only `http`, `https` and `mailto` destinations become
+`[text](…)` — a page can carry someone's share link as content, but the Markdown
+output never turns a non-web scheme into an actionable link; an `img` whose
+`src` is not http(s) renders as its alt. Rendering applies only to what
+`TextDecoder` calls text: a trace body or a JSON
+document's decoded text passes through unchanged for every format — only `raw`
+is wire-exact. The content sniff — `looksLikeHTML` judging the body's opening
+when no Content-Type arrived — is defensive: a nil Content-Type never reaches
+the renderer in today's fetch path. Fixtures
+are captured pages, one per shape — a GitHub README, a Wikipedia article, an Apple
+Documentation SPA shell — plus a hand-written `constructs.html` carrying every
+construct; provenance and licences live in
+`Tests/ElsewhereKitTests/Fixtures/html/SOURCES.md`, and goldens are the renderer's
+own output, frozen after a read (`ELSEWHERE_WRITE_GOLDENS=1` regenerates).
+
+## `Pager` pages in characters, with a continue marker
+
+`--max-length`/`--start-index` mirror the reference MCP fetch tool's
+`max_length`/`start_index`: a cut is in `Character`s — an emoji or a combining
+sequence is never split — and a page that leaves a remainder ends with
+`<elsewhere:truncated next_start_index=N total=T>`. `startIndex` past the end
+returns the marker alone (nothing more to read is information, not an error), and
+the CLI default of 0 means unlimited while M2's tool gets the agent-friendly 5000.
+The marker and the `Source:` footer are plain text a fetched page could imitate —
+accepted: the reader is an agent, and `--json` is the machine-readable channel
+when the distinction matters.
 
 ## Signals cancel the work; the exit is 128 + the signal
 

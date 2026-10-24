@@ -129,3 +129,6 @@ struct ProxySessionFactoryTests {
         }
     }
 }
+
+// `OutputBodyTests` lives in its own file — it tests the Kit seam, not fetch
+// policy.

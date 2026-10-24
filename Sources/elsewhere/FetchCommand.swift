@@ -1,10 +1,13 @@
-import ArgumentParser
+public import ArgumentParser // ExpressibleByArgument conformance below
 import ElsewhereKit
 import Foundation
 
+extension OutputFormat: ExpressibleByArgument {} // String raw value — free init
+
 /// `elsewhere fetch URL` — one URL through one exit (§5.5). The body is stdout's
 /// payload; everything about the fetch is stderr or `--json`. HTTP ≥ 400 is a result
-/// the agent reads, not a failure — exit stays 0. Markdown arrives with PR #3.
+/// the agent reads, not a failure — exit stays 0. HTML renders as Markdown by
+/// default (`--format`), `--max-length`/`--start-index` page long bodies.
 struct FetchCommand: AsyncParsableCommand {
     static let configuration = CommandConfiguration(
         commandName: "fetch",
@@ -16,7 +19,13 @@ struct FetchCommand: AsyncParsableCommand {
         flagged), a Chrome User-Agent unless --user-agent says otherwise.
         --timeout bounds the whole fetch, not a single read. Private/local
         destinations are refused unless --allow-private. Exit status is 0 even on
-        HTTP >= 400 — the status is data.
+        HTTP >= 400 — the status is data. --format markdown turns HTML
+        into Markdown with a Source: footer (text strips the markers, raw prints
+        the response bytes verbatim); --max-length N stops at N characters and
+        ends the page with a <elsewhere:truncated next_start_index=M total=T>
+        marker — pass M to --start-index to read on. Paging applies to rendered
+        text; raw is the bytes. --json's body is always the decoded text (JSON
+        cannot carry bytes). --head and --output ignore --format.
         """
     )
 
@@ -48,6 +57,15 @@ struct FetchCommand: AsyncParsableCommand {
     @Flag(help: "Print a JSON result object on stdout instead of the body.")
     var json = false
 
+    @Option(help: "Body format: markdown (default), text or raw. raw is the response bytes verbatim; --json still carries decoded text.")
+    var format: OutputFormat = .markdown
+
+    @Option(help: "Characters of rendered text to print (markdown/text only); 0 = unlimited (default 0).")
+    var maxLength = 0
+
+    @Option(help: "Character index to start rendered text at — a truncation marker's next_start_index.")
+    var startIndex = 0
+
     func validate() throws {
         if output != nil, head {
             throw ValidationError("--head has no body to save; drop --output")
@@ -57,6 +75,12 @@ struct FetchCommand: AsyncParsableCommand {
         }
         if timeout <= 0 {
             throw ValidationError("--timeout wants a positive number of seconds")
+        }
+        if startIndex < 0 {
+            throw ValidationError("--start-index wants a non-negative index")
+        }
+        if maxLength < 0 {
+            throw ValidationError("--max-length wants a non-negative count")
         }
     }
 
@@ -103,15 +127,20 @@ struct FetchCommand: AsyncParsableCommand {
     }
 
     /// Renders the result: `--json` the object, `--head` the status line + headers,
-    /// `--output` the file, else the decoded body on stdout — or the binary notice.
+    /// `--output` the file, else the body's `OutputBody` selection on stdout.
+    /// `--head`/`--output` ignore `--format`; a body TextDecoder declines is
+    /// untouched by the renderer either way.
     private func report(_ result: FetchResult) throws(ElsewhereError) {
-        let decoded = TextDecoder.decode(result.body, contentType: result.contentType)
+        let selection = OutputBody.select(
+            result, format: format,
+            startIndex: startIndex, maxLength: maxLength, head: head)
         if json {
             struct Payload: Encodable {
                 let url, finalURL: String
                 let status: Int
                 let contentType: String?
                 let exit: String
+                let format: String
                 let elapsedMs: Int64
                 let bytes: Int
                 let truncated: Bool
@@ -127,12 +156,13 @@ struct FetchCommand: AsyncParsableCommand {
                 status: result.status,
                 contentType: result.contentType,
                 exit: result.exit,
+                format: format.rawValue,
                 elapsedMs: elapsed.seconds * 1000 + elapsed.attoseconds / 1_000_000_000_000_000,
                 bytes: result.body.count,
                 truncated: result.truncated,
                 redirects: result.redirects.map(Redactor.redact(url:)),
                 headers: result.headers,
-                body: decoded?.text)
+                body: OutputBody.json(selection, of: result))
             let encoder = JSONEncoder()
             encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
             do {
@@ -152,12 +182,20 @@ struct FetchCommand: AsyncParsableCommand {
                 throw .fetch("cannot write \(output): \(error.localizedDescription)")
             }
             printError("saved \(result.body.count) bytes to \(output)")
-        } else if let decoded {
-            FileHandle.standardOutput.write(Data(decoded.text.utf8))
         } else {
-            printError(
-                "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "
-                    + "pass --output FILE to save it")
+            switch selection {
+            case .bytes(let data):
+                // raw — the wire bytes, untouched.
+                FileHandle.standardOutput.write(data)
+            case .text(let body):
+                FileHandle.standardOutput.write(Data(body.utf8))
+            case .undecodable:
+                printError(
+                    "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "
+                        + "pass --output FILE to save it")
+            case .none:
+                break // --head takes its own branch above; .none can't reach here
+            }
         }
         if result.truncated {
             printError("body truncated at \(FetchLimits.maxBodyBytes / 1_000_000) MB")

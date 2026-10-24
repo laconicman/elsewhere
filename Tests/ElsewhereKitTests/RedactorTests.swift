@@ -223,4 +223,18 @@ struct RedactorTests {
         let plain = try #require(URL(string: "https://example.com/a"))
         #expect(Redactor.redact(url: plain) == "https://example.com/a")
     }
+
+    /// Header values are text, not URLs — the same userinfo rule applied where a
+    /// `Location`/`Link`/`Content-Location` could carry `user:pass@` to stdout.
+    /// An `@` in the query or no URL at all passes through.
+    @Test func urlShapedTextLosesItsUserinfo() {
+        #expect(Redactor.redactUserinfo(in: "https://user:secret@example.com/x?y=1")
+            == "https://example.com/x?y=1")
+        #expect(Redactor.redactUserinfo(in: #"<https://user:s@cret@example.com/n>; rel="next""#)
+            == #"<https://example.com/n>; rel="next""#)
+        #expect(Redactor.redactUserinfo(in: "https://example.com/p?mail=a@b")
+            == "https://example.com/p?mail=a@b")
+        #expect(Redactor.redactUserinfo(in: "text/html; charset=utf-8")
+            == "text/html; charset=utf-8")
+    }
 }

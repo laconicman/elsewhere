@@ -1,7 +1,8 @@
 // swift-tools-version: 6.4
 // devin-kick's shape: the façade library in the middle, the executable thin at the edge,
 // house tooling on top. The engine is a binary-target package of its own (swift-libxray);
-// SwiftSoup and the MCP SDK join in their own PRs — nothing speculative now.
+// SwiftSoup is the HTML parser for `Renderer` (§3.7 — the field of tiny libraries);
+// the MCP SDK joins at M2.
 import PackageDescription
 
 /// Swift 7 upcoming features, on for every handwritten target (see the Design article).
@@ -33,6 +34,9 @@ let package = Package(
         // The engine: the official libXray artifact as a SwiftPM package (sibling repo).
         .package(url: "https://github.com/laconicman/swift-libxray", from: "0.1.0"),
         .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
+        // HTML → Markdown: the parser (§3.7). Internal to ElsewhereKit — never a
+        // SwiftSoup type in the public surface (rule 1).
+        .package(url: "https://github.com/scinfu/SwiftSoup", from: "2.14.0"),
         // DocC catalog rendering via `swift package generate-documentation`.
         .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.4.0"),
     ],
@@ -41,7 +45,10 @@ let package = Package(
         // live exits, the generated config, the tunnel lifecycle and the guards.
         .target(
             name: "ElsewhereKit",
-            dependencies: [.product(name: "XrayCore", package: "swift-libxray")],
+            dependencies: [
+                .product(name: "XrayCore", package: "swift-libxray"),
+                .product(name: "SwiftSoup", package: "SwiftSoup"),
+            ],
             swiftSettings: upcoming
         ),
         // The `elsewhere` binary: ArgumentParser glue only — the logic is the Kit's

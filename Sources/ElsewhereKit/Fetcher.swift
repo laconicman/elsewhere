@@ -60,6 +60,7 @@ public struct FetchResult: Sendable {
     public var status: Int
     /// Response headers, keys lowercased — `headers["content-type"]`, not the wire
     /// spelling (HTTP field names are case-insensitive; one normalization for all).
+    /// URL-shaped values carry no userinfo — same rule as a printed URL.
     public var headers: [String: String]
     public var contentType: String?
     public var body: Data
@@ -283,7 +284,7 @@ public enum Fetcher {
                 finalURL: http.url ?? request.url,
                 status: http.statusCode,
                 headers: http.allHeaderFields.reduce(into: [:]) {
-                    $0["\($1.key)".lowercased()] = "\($1.value)"
+                    $0["\($1.key)".lowercased()] = Redactor.redactUserinfo(in: "\($1.value)")
                 },
                 contentType: http.value(forHTTPHeaderField: "Content-Type"),
                 body: body,
