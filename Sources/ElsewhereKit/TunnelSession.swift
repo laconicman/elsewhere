@@ -122,6 +122,12 @@ public actor TunnelSession {
         return route
     }
 
+    /// Whether the session's lanes still run — `serve`'s reopen check. A
+    /// proxy-only session has no engine to die: it is alive while open.
+    public var isAlive: Bool {
+        get async { startedEngine ? await supervisor.isAlive : true }
+    }
+
     /// Stops the engine if this session started it; idempotent, never throws.
     public func close() async {
         if startedEngine {

@@ -76,7 +76,9 @@ CLI) or the protocol (MCP stdio). So the generated config is `"log":{"access":"n
 "warning"}` when a log path is given — ``XrayConfigBuilder/XrayLog`` is exactly those two
 shapes. There is no middle volume and no stderr route (swift-libxray TD-6, here TD-3).
 **Rejected:** defaulting to a file under `~/Library/Logs` — silent is the honest default
-for a tool whose output is consumed by agents; `serve` may pick the file shape at M2.
+for a tool whose output is consumed by agents; `serve` picks the file shape because a
+server's operator has no stdout to read (see "`serve` keeps one engine with every lane,
+lazily").
 
 ## Flat and classic outbound shapes both accepted
 
@@ -106,7 +108,7 @@ starts them all on one engine (A9). A `proxy` exit is a `Route.external` — URL
 talks to that proxy directly and the engine never starts at all. `TunnelSession.open`
 is where names become routes. **Rejected:** always starting every lane (slower, and a
 broken exit would poison unrelated fetches) and a warm-up probe (A7 — the fetch itself
-is the probe; `serve` may warm up at M2).
+is the probe; `serve` does not warm up either).
 
 ## stdout is the payload; metadata is stderr or `--json`
 
@@ -259,6 +261,51 @@ the engine has its own release cadence (upstream asset bumps) and consumers beyo
 tool; coupling them would pin the engine's semver to the tool's. **Rejected:** a monorepo
 target (the artifact's provenance records deserve their own review surface — they got
 one, on PR #4).
+
+## `serve` keeps one engine with every lane, lazily
+
+`elsewhere serve` holds **one** ``TunnelSession`` behind the three tools, opened on the
+first call that needs a route — with every Xray lane *and* `direct`, so switching exits
+never restarts the core. Where the CLI opens only the lanes a call needs (A9), a server
+pays one Go start and reuses it across calls and exits. The config is re-read per call:
+when an exit changed — added, removed or edited — or the bind interface did, and
+nothing is in flight, the session is reopened on that call; while a call runs, the
+current session serves and a name the file just gained gets the Kit's `.exit` — the
+next call picks it up. A dead engine (``TunnelSession/isAlive`` false) reopens the same
+way, and a failed start backs off 1 s doubling to 30 s — a call inside the window is
+refused without a new attempt. The SDK runs tool calls concurrently (C6), so that
+decision — reuse, reopen or refuse — is taken one call at a time: a call arriving
+mid-decision waits for it and decides on the state it left. The engine stops after
+`--idle-stop` minutes of no calls (default 10, `0` = never), counted from the last call's
+end — never while a call is in flight — and restarts on demand. There is no warm-up probe
+(A7 holds: the fetch is the probe; `elsewhere_whoami` is the probe when wanted). stdout
+is the protocol, so the engine log defaults to a file —
+`~/Library/Logs/elsewhere/xray.log`, in a 0700 directory at 0600 — when neither
+`--xray-log` nor `ELSEWHERE_XRAY_LOG` is given, and `--log-tsv` keeps an audit row per
+call and per lifecycle edge. **Rejected:** a session per call — a cold Go start per
+fetch — and a warm-up probe, which spends a request proving what the first real call
+proves anyway.
+
+The tool inputs are the reference MCP fetch tool's plus `exit`: `elsewhere_fetch`
+takes `url`, `exit`, `max_length` (5000, at most 200000), `start_index` and `raw`;
+`elsewhere_whoami` takes `exit`; `elsewhere_exits` takes nothing. `--allow-private`
+is a *serve* flag applied to every fetch/whoami in the process, never a tool
+argument — a fetched page is untrusted text, and no page may talk a model into
+fetching the LAN. Each description carries the "what an exit is" legend, because a
+host may load one tool's description and never another.
+
+## No `elsewhere_run` tool
+
+The CLI's `run -- CMD` has no MCP counterpart. Every host that could call such a tool
+already has a shell, where `elsewhere run -- …` does the same under the host's own
+command approval. A tool that executes arbitrary commands with a proxy environment
+would widen the server's surface — a page fetched through `elsewhere_fetch` is
+untrusted text that can steer a model, and the step after reading it must not be able
+to be "run this" — and would make the server's read-only annotations false. The three
+tools are read-only and idempotent; the only side effect is the engine's own
+lifecycle. If a host without a shell ever needs it, it belongs in a separate tool
+profile, off by default, with an allowlist of commands (devin-kick's profile
+pattern) — not in the default server.
 
 ## See Also
 

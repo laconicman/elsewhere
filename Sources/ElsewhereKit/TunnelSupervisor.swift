@@ -25,6 +25,16 @@ public actor TunnelSupervisor {
     public private(set) var lanes: [XrayConfigBuilder.Lane] = []
     /// True between a ready `start` and `stop` — the guard against double-start.
     public private(set) var isUp = false
+
+    /// `isUp` *and* the core behind it actually runs — `serve`'s reopen check
+    /// needs the difference: a dead core (crashed, killed) leaves `isUp` true
+    /// with nothing behind it.
+    public var isAlive: Bool {
+        get async {
+            guard isUp else { return false }
+            return await XrayCore.shared.isRunning
+        }
+    }
     /// True across a `start`'s awaits — the reentry guard `isUp` can't cover.
     private var starting = false
     /// The running exits' outbound secrets — `test`/`run`/`stop` messages and logs

@@ -87,8 +87,9 @@ public struct ConfigStore: Sendable {
 
     /// A `DecodingError` rendered by case with its coding path —
     /// `keyNotFound 'link' at exits.moldova` — so the diagnostic is precise without
-    /// ever forwarding a decoder message raw.
-    static func describe(_ error: DecodingError) -> String {
+    /// ever forwarding a decoder message raw. The MCP layer renders a tool call's
+    /// bad arguments with it the same way.
+    public static func describe(_ error: DecodingError) -> String {
         func path(_ context: DecodingError.Context) -> String {
             context.codingPath.isEmpty
                 ? "root"
