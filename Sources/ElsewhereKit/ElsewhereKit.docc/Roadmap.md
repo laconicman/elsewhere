@@ -13,12 +13,14 @@ through the default exit and `--direct` prints the ISP's; `whoami --all` shows b
 while INCY is connected; `run -- curl` and `run -- git clone` work through an exit;
 `exits`/`doctor` redact; renderer fixtures green.
 
-- **PR #1 (this one):** the Kit model — config, exits, redaction, the generated Xray
-  config — plus `exits` and `doctor`, and the house files.
-- **PR #2** ([#7](https://github.com/laconicman/elsewhere/issues/7)):
+- **PR #1:** the Kit model — config, exits, redaction, the generated Xray config —
+  plus `exits` and `doctor`, and the house files.
+- **PR #2 (this one)** ([#7](https://github.com/laconicman/elsewhere/issues/7)):
   `TunnelSupervisor` (lifecycle guards, stop + fresh ports + one retry per Design),
-  `Fetcher` with the private-address guard, and `fetch`/`whoami`/`run`.
-- **PR #3** ([#8](https://github.com/laconicman/elsewhere/issues/8)): `Renderer`
+  `TunnelSession`, `Fetcher` with the private-address guard and the redirect policy,
+  `TextDecoder`, `WhoAmI`/`Trace`, `ChildRunner` — and the `fetch`/`whoami`/`run`
+  commands with the signal contract.
+- **PR #3 — next** ([#8](https://github.com/laconicman/elsewhere/issues/8)): `Renderer`
   (HTML → Markdown via SwiftSoup), `Pager` with the truncation marker, saved-page
   fixtures.
 - [#1](https://github.com/laconicman/elsewhere/issues/1) the S4/S5 live spikes with the

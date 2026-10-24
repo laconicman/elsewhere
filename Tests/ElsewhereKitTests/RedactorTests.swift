@@ -214,4 +214,13 @@ struct RedactorTests {
             "bad value s3cr3t for h", secrets: Redactor.secrets(in: outbound))
         #expect(scrubbed == "bad value … for h")
     }
+
+    /// Printed URLs (`--json`'s fields, the stderr note) keep everything but the
+    /// userinfo — where a request went is data, its credentials are not.
+    @Test func aPrintedURLDropsUserinfo() throws {
+        let url = try #require(URL(string: "https://u:p@example.com:8443/a?b=c#frag"))
+        #expect(Redactor.redact(url: url) == "https://example.com:8443/a?b=c#frag")
+        let plain = try #require(URL(string: "https://example.com/a"))
+        #expect(Redactor.redact(url: plain) == "https://example.com/a")
+    }
 }

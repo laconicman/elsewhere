@@ -24,9 +24,9 @@ bypass the system tunnel that owns the default route.
 
 ## Status
 
-**M1 (fetch) in progress** — this build has the config model, `exits` and `doctor`;
-`fetch`/`whoami`/`run` land next, `serve` (MCP) with M2. The first tag, `0.1.0`, is cut
-when M2 (`serve`) lands; M1 has no tag.
+**M1 (fetch) in progress** — this build has the config model, `exits`, `doctor`, and
+`fetch`/`whoami`/`run`; Markdown rendering lands with the next PR, `serve` (MCP) with
+M2. The first tag, `0.1.0`, is cut when M2 (`serve`) lands; M1 has no tag.
 
 ## Requirements
 
@@ -63,6 +63,35 @@ through the engine's own validator:
 elsewhere doctor    # [ok]/[info]/[warn]/[FAIL] lines; exit 1 on any failure
 ```
 
+## Use it
+
+```sh
+elsewhere fetch https://example.com/ --exit moldova  # the page body on stdout
+elsewhere whoami --all                               # ip/loc per exit, direct last
+elsewhere run --exit moldova -- git clone https://…  # HTTP(S)_/ALL_PROXY exported
+```
+
+`fetch` writes the decoded body to stdout and *everything else* to stderr — status
+lines, truncation and binary notices, the `HTTP <status>` note. `--json` prints the
+whole result object instead; `--head` prints status and headers; `--output FILE`
+saves the raw body. Defaults: GET, up to 10 redirects (each hop re-checked by the
+private-address guard), a 25 s timeout that bounds the *whole* fetch — a body that
+trickles a byte at a time still hits it — a 5 MB body cap, and a Chrome User-Agent
+(`--user-agent` overrides). HTTP ≥ 400 is a *result*, not a failure — exit stays 0;
+the status is data the agent reads. Private/local destinations are refused unless
+`--allow-private` — the tool reaches everywhere the tunnel does, so a mistyped URL
+must never be the way something reads a LAN or link-local address.
+
+`--via-system` unbinds the engine's outbound sockets so they ride the system path —
+the system VPN when one is up. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) writes the
+engine's warnings to a file; silent by default, since Xray's console log is stdout
+and stdout here is the payload. `run`'s child gets `HTTP_PROXY`/`HTTPS_PROXY` at
+`http://127.0.0.1:PORT` and `ALL_PROXY` at `socks5h://127.0.0.1:PORT` (the `h` keeps
+DNS remote) for a tunnel lane — or the exit's own URL for a `proxy` exit, credentials
+included: the child needs them to authenticate, and they are exported verbatim — plus
+`NO_PROXY` — the parent's own bypass list with loopback added — in upper and
+lower case.
+
 ### The config file
 
 `~/Library/Application Support/elsewhere/config.json`, directory 0700, file 0600 — it
@@ -94,6 +123,7 @@ holds the secrets. Hand-editable; a redacted shape:
 |---|---|
 | `ELSEWHERE_CONFIG` | Config path (the `--config` flag beats it). |
 | `ELSEWHERE_LINK` | A single `vless://…` link; synthesizes one in-memory exit named `env` and ignores the file entirely. |
+| `ELSEWHERE_XRAY_LOG` | Path for the engine's warnings; `--xray-log` beats it, silent is the default. |
 
 ## Exit status
 
@@ -107,6 +137,8 @@ Stable — scripts may rely on it (BSD `sysexits(3)` values):
 | 69 | the engine or tunnel is unavailable |
 | 77 | the private-address guard refused the destination |
 | 78 | configuration error |
+
+128 + *n* means the signal — the shell convention, not ours (SIGINT → 130).
 
 ## The User-Agent, and why it is Chrome's
 

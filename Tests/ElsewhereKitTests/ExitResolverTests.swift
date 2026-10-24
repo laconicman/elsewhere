@@ -6,7 +6,7 @@ import XrayCore
 /// Link → engine → flat outbound, and the proof that the flat shape splices into a full
 /// Xray config. Serialized: the Go runtime is one per process. Engine calls here are
 /// pure conversion and loopback-free validation — `test` binds nothing (consult C5 §3).
-@Suite("ExitResolver — engine conversion and the splice proof", .serialized)
+@Suite("ExitResolver — engine conversion and the splice proof", .serialized, .engineGate)
 struct ExitResolverTests {
     @Test func syntheticLinkYieldsTheFlatOutbound() async throws {
         let outbound = try #require(

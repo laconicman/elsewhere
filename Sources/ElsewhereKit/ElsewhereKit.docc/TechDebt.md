@@ -17,15 +17,17 @@ the build to `0.0.0`, so only the major version moves).
 **Discharge:** bump the constant each release (it is one named constant on purpose);
 mechanising it (scraping chromereleases at build time) is worse than the debt.
 
-### TD-2 — `freePorts` are candidates, not reservations — *open*, [#3](https://github.com/laconicman/elsewhere/issues/3)
+### TD-2 — `freePorts` are candidates, not reservations — *discharged*, [#3](https://github.com/laconicman/elsewhere/issues/3)
 
 The inbound ports come from `XrayCore.freePorts`, which checks-now/uses-later: between
 the check and `run` a port can be taken, and a taken port fails `run` mid-start with the
 instance in an unknown state (C5 §5).
 
 **Cost:** a rare, timing-dependent start failure.
-**Discharge:** PR #2's `TunnelSupervisor` policy — defensive `stop`, fresh candidates,
-one retry — pinned by a test once the lifecycle tests exist.
+**Discharge:** discharged by `TunnelSupervisor`'s policy — defensive `stop`, fresh
+candidates, one retry — in `86d4f23` (`FEAT: TunnelSupervisor and TunnelSession`),
+pinned by `aTakenCandidateRetriesWithFreshPorts`: the first draw is deliberately squat
+on and the second draw wins.
 
 ### TD-3 — the engine log has no API hook — *open*, [#4](https://github.com/laconicman/elsewhere/issues/4)
 
@@ -59,6 +61,17 @@ the behaviour at these edges is asserted nowhere in swift-libxray 0.1.0 (planned
 relying on a contract; a wrong edge is discovered at runtime.
 **Discharge:** swift-libxray 0.2.0 pins the edges with tests; the guards stay as
 defense-in-depth.
+
+### TD-7 — the body is read byte by byte — *open*, [#14](https://github.com/laconicman/elsewhere/issues/14)
+
+`Fetcher` consumes `session.bytes(for:)`'s `AsyncBytes` one `UInt8` at a time so the
+5 MB cap can cut mid-stream. Measured 2026-10-24: the 5.6 MB loopback body through a
+live engine lane completes in ~0.6 s (~9 MB/s) — fine for 0.1.0.
+
+**Cost:** per-byte iteration is roughly an order of magnitude slower than a
+`dataTask` delegate buffer; it shows only on multi-MB responses.
+**Discharge:** rewrite the read path as a `URLSessionDataDelegate` accumulating
+`Data` chunks if the measurement ever says it matters — it does not yet.
 
 ## See Also
 

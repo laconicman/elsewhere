@@ -8,7 +8,9 @@ import XrayCore
 /// generated config validated by the engine. Serialized — the Go runtime is one per
 /// process. No check may ever print a secret: the final assertion greps the rendered
 /// lines for them.
-@Suite("Doctor — verdicts, ordering, no secrets", .serialized, .temporaryDirectories)
+@Suite(
+    "Doctor — verdicts, ordering, no secrets",
+    .serialized, .engineGate, .temporaryDirectories)
 struct DoctorTests {
     private func store() -> ConfigStore {
         ConfigStore(url: temporaryDirectory().appending(path: "elsewhere/config.json"))

@@ -73,6 +73,19 @@ struct XrayConfigBuilderTests {
         #expect(configJSON == (try Self.fixture("one-exit-unbound")))
     }
 
+    @Test func oneExitWithoutDirectMatchesGolden() throws {
+        // A9: `fetch --exit moldova` binds its lane and nothing else — `directPort:
+        // nil` emits no in:direct/out:direct/rule/lane.
+        let (configJSON, lanes) = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152],
+            directPort: nil,
+            bindInterface: "en0")
+        #expect(configJSON == (try Self.fixture("one-exit-no-direct")))
+        #expect(lanes.count == 1)
+        #expect(!configJSON.contains("direct"))
+    }
+
     @Test func fileLogMatchesGolden() throws {
         let (configJSON, _) = try XrayConfigBuilder.build(
             exits: [("moldova", Self.spikeOutbound())],
@@ -103,6 +116,9 @@ struct XrayConfigBuilderTests {
             ("one-exit-unbound", try XrayConfigBuilder.build(
                 exits: [("moldova", Self.spikeOutbound())], ports: ["moldova": 49152],
                 directPort: 49154, bindInterface: nil).configJSON),
+            ("one-exit-no-direct", try XrayConfigBuilder.build(
+                exits: [("moldova", Self.spikeOutbound())], ports: ["moldova": 49152],
+                directPort: nil, bindInterface: "en0").configJSON),
             ("one-exit-file-log", try XrayConfigBuilder.build(
                 exits: [("moldova", Self.spikeOutbound())], ports: ["moldova": 49152],
                 directPort: 49154, bindInterface: nil, log: .file("/tmp/xray.log")).configJSON),

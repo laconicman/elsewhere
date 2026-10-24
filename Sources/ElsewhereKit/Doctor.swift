@@ -36,7 +36,7 @@ public enum Doctor {
     public static func run(
         store: ConfigStore,
         environment: [String: String],
-        localProxyPort: UInt16 = 10808,
+        localProxyPort: UInt16 = LocalProxy.incyPort,
         interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve,
         portCandidates: (@Sendable (Int, [UInt16]) async throws -> [UInt16])? = nil
     ) async -> [Check] {

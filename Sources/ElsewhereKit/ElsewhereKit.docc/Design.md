@@ -27,7 +27,11 @@ six months behind upstream, per the plan's Appendix B).
 There is one Go runtime per process, so one running engine — and several exits at once are
 expressed as **one `mixed` inbound per exit** on 127.0.0.1 plus field routing to each
 exit's outbound (C4: two `runXray` instances are unsupported). `fetch --exit NAME` then
-just points URLSession at `in:<name>`'s port. **Rejected:** restarting the engine to
+just points URLSession at `in:<name>`'s port. Ownership is enforced at process scope:
+`TunnelSupervisor` claims the engine when it starts, a second live supervisor's `start`
+is refused rather than allowed to stop a core it doesn't own, and `stop` releases only
+its own claim — one supervisor per session is still the shape, `serve` (M2) will share
+sessions rather than engines. **Rejected:** restarting the engine to
 switch exits — slower and loses warm connections; several `XrayCore` instances —
 impossible.
 
@@ -47,7 +51,8 @@ the inbound keeps both ears anyway.
 while a system tunnel (INCY's utun) owns the default route, sockets bound to `en0` leave
 through it (S3 proved it on the live tunnel — bound egress differed). `auto` resolves the
 current path's first physical interface at tunnel start via `NWPathMonitor`; if none is
-found that is a `doctor` failure and a tunnel-time error, never a quiet unbind (rule 5).
+found that is a `doctor` failure and a tunnel-time error, never a quiet unbind (A8 —
+rule 5).
 **The caveat (C5 §6):** the *connection* is bound; the *hostname lookup* is not — Xray's
 freedom outbound resolves through the system resolver. Direct connection, system-path
 lookup; accepted for 0.1.0 (TD-4). **Rejected:** per-exit binding (unneeded flexibility)
@@ -92,6 +97,69 @@ candidate port is a `run`-time failure: the instance then sits in an unknown sta
 `freePorts`, one retry. Lifecycle edges (`run` while running, `test` while running,
 `stop` when stopped) are unpinned upstream until swift-libxray 0.2.0 — guarded with
 `isRunning` meanwhile (TD-5).
+
+## The CLI starts only the lanes it needs
+
+`fetch --exit moldova` brings up `moldova`'s lane and nothing else; `--direct` brings
+up only `out:direct`; `whoami --all` is the one call that wants every lane, so it
+starts them all on one engine (A9). A `proxy` exit is a `Route.external` — URLSession
+talks to that proxy directly and the engine never starts at all. `TunnelSession.open`
+is where names become routes. **Rejected:** always starting every lane (slower, and a
+broken exit would poison unrelated fetches) and a warm-up probe (A7 — the fetch itself
+is the probe; `serve` may warm up at M2).
+
+## stdout is the payload; metadata is stderr or `--json`
+
+`fetch` prints the decoded body and nothing else on stdout — an agent pipes it without
+a `sed`. Status lines, truncation and binary notices, and the `HTTP <status>` note go
+to stderr; `--json` replaces the body with the whole result object when a caller wants
+structure. Printed URLs — the JSON fields, the redirect list, the stderr note — keep
+scheme, host, path and query but never userinfo: where a request went is data, a
+credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
+the status is data
+the agent reads (§5.5). **Rejected:** stderr-and-no-body on errors (loses the page's
+own error body) and a JSON envelope by default (most calls want the page).
+
+## The private-address guard judges literals, not names
+
+`fetch` refuses private/local destinations unless `--allow-private` — the tool reaches
+everywhere the tunnel does, so a mistyped URL must never be the way something reads
+`169.254.169.254`. Every redirect hop is re-checked, and a refused hop becomes the
+thrown error rather than the pre-hop 3xx. Hostnames are **not** resolved locally: a
+name's address depends on *where* it resolves, and the exit resolves it — refusing a
+public hostname that happens to land on a LAN address here would answer the wrong
+question. Only what can be judged is refused: `localhost`/`*.localhost` and IP literals
+(v4 ranges; v6 `::`, `::1`, `fc00::/7`, `fe80::/10`; `::ffff:v4` judged by the
+embedded v4). The reference MCP fetch server has the same shape.
+
+## `run` exports a proxy environment, not a sandbox
+
+`run -- CMD` sets `HTTP_PROXY`/`HTTPS_PROXY` to `http://127.0.0.1:PORT` and
+`ALL_PROXY` to `socks5h://127.0.0.1:PORT` — the `mixed` inbound speaks SOCKS5, and
+the `h` keeps DNS remote (the exit resolves, not the LAN). `NO_PROXY` is the
+parent's bypass list plus loopback — an internal host the parent keeps off a
+proxy stays off ours, which could not resolve it anyway;
+everything lands in upper and lower case because tools disagree on which they read. A
+`proxy` exit passes its configured URL through. The child inherits stdio and its
+status is ours — 128 + signal on a signal death (unless the parent itself was
+signalled: then the signal rule below sets the status, whatever the child
+reported) — and the parent ignores
+SIGINT/SIGTERM while it lives: the terminal already delivered them to the whole
+foreground group, so the child gets its own copy and the parent must outlive it to
+stop the tunnel. A `proxy` exit's configured URL — credentials included — is exported
+to the child's environment verbatim; the child needs it to authenticate, and that is
+the contract, said plainly. Task cancellation is forwarded to the child — `terminate()` (SIGTERM)
+first, a `SIGKILL` five seconds later if it still stands — and the reaped status
+(143/137) flows back like any other exit. **Rejected:** per-app routing machinery
+(pf, a transparent proxy) —
+heavier than the contract needs.
+
+## Signals cancel the work; the exit is 128 + the signal
+
+SIGINT/SIGTERM are dispatch-sourced (`signal(sig, SIG_IGN)` first, then
+`DispatchSourceSignal` — Domicile's `SignalSource` shape, copied), cancel the
+command's work task, and exit 128 + the signal number once the session has closed —
+the code a shell expects, after a polite stop of the Go runtime.
 
 ## No protocol allowlist — the engine validates
 
