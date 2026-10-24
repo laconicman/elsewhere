@@ -26,9 +26,9 @@ public enum ElsewhereServer {
     /// Serves on stdio until stdin closes (the host quit) or the task is
     /// cancelled (SIGINT/SIGTERM via the CLI's `withSignalCancellation`). stdin
     /// EOF returns `waitUntilCompleted` without `stop()` (swift-sdk 0.12.1), so
-    /// teardown lives after it — `close(reason:)` the tunnel, then `stop()`.
+    /// teardown lives after it — `shutdown(reason:)` the tunnel, then `stop()`.
     /// A cancelled wait unblocks the same way: `onCancel` stops the server, the
-    /// wait returns, and the tunnel closes with reason `signal`.
+    /// wait returns, and the tunnel shuts down with reason `signal`.
     ///
     /// - Throws: `.config` from `--log-tsv`, and `.engine` on a transport
     ///   failure — the "something under us failed" case the Kit already has.
@@ -60,7 +60,7 @@ public enum ElsewhereServer {
         } catch {
             failure = error
         }
-        await context.tunnel.close(reason: Task.isCancelled ? "signal" : "eof")
+        await context.tunnel.shutdown(reason: Task.isCancelled ? "signal" : "eof")
         await server.stop()
         if let failure, !(failure is CancellationError) {
             throw .engine(

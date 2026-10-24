@@ -14,7 +14,7 @@ import Foundation
 /// gets the Kit's `.exit` from `route(for:)`. A dead engine
 /// (`isAlive` false) reopens the same way. A failed start backs off 1 s
 /// doubling to 30 s — a call inside the window is refused without a new
-/// attempt.
+/// attempt. `shutdown` is terminal: every later lease is refused.
 actor ServeTunnel {
     /// A held session: the open lanes plus the config the session was opened
     /// against — the call resolves `exit` against this read.
@@ -69,6 +69,10 @@ actor ServeTunnel {
     /// is read with no lease mid-decision.
     private var deciding = false
     private var waiting: [CheckedContinuation<Void, Never>] = []
+    /// Set by `shutdown`: a lease after it is refused, never started — a waiter
+    /// resumed after the teardown, or a decision already past `takeTurn`, must
+    /// not open an engine the server has just stopped.
+    private var closed = false
 
     init(
         store: ConfigStore, environment: [String: String], options: ServeOptions,
@@ -105,6 +109,7 @@ actor ServeTunnel {
     func lease() async throws(ElsewhereError) -> Lease {
         await takeTurn()
         defer { endTurn() }
+        try checkOpen()
         // Inside the turn: a config read before it could predate the reopen
         // the previous decision just did, and a backoff check before it could
         // let a waiter start right after the failure it should back off from.
@@ -161,6 +166,19 @@ actor ServeTunnel {
         tsv?.log(event: "down", exit: reason)
     }
 
+    /// Terminal — `serve`'s EOF/signal teardown: marks the tunnel closed
+    /// *before* awaiting an in-flight start, then `close`s. `close(reason:)`
+    /// alone stays non-terminal for `idle` and `reopen`.
+    func shutdown(reason: String) async {
+        closed = true
+        await close(reason: reason)
+    }
+
+    /// - Throws: `.tunnel` once `shutdown` ran.
+    private func checkOpen() throws(ElsewhereError) {
+        if closed { throw .tunnel("the server is shutting down") }
+    }
+
     /// One start attempt and its TSV edges — `up` carries the lane count the
     /// session was asked for (every exit + direct); a failure arms the backoff
     /// window before the error propagates. Only a lease holding the turn
@@ -170,6 +188,7 @@ actor ServeTunnel {
     private func start(
         _ config: ElsewhereConfig, routing: Routing
     ) async throws(ElsewhereError) -> TunnelSession {
+        try checkOpen()
         let gen = generation
         let attempt = Task<Result<TunnelSession, ElsewhereError>, Never> {
             do throws(ElsewhereError) {

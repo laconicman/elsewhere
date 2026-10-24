@@ -250,6 +250,48 @@ struct ServeTunnelTests {
         await systemTunnel.close(reason: "eof")
     }
 
+    /// Shutdown is terminal: a lease queued behind a decision and resumed
+    /// after the teardown, or one already past `takeTurn`, must not open an
+    /// engine the server just stopped — every later lease is refused.
+    @Test func aShutdownRefusesQueuedAndLaterLeases() async throws {
+        let opens = Opens()
+        let tunnel = ServeTunnel(
+            store: try store(), environment: [:],
+            options: ServeOptions(idleStop: nil)
+        ) { config, _, _ throws(ElsewhereError) -> TunnelSession in
+            opens.bump()
+            try? await Task.sleep(for: .milliseconds(300))
+            return try await TunnelSession.open(
+                config: config, exits: Set(config.exits.keys), includeDirect: false,
+                bindInterface: .none, log: .silent)
+        }
+        async let first = tunnel.lease()
+        try await Task.sleep(for: .milliseconds(50)) // mid-start: holds the turn
+        async let second = tunnel.lease() // queued in waiting
+        try await Task.sleep(for: .milliseconds(50))
+        await tunnel.shutdown(reason: "eof")
+        do { // async let erases the typed throw — the error is ElsewhereError
+            _ = try await first
+            Issue.record("expected the in-flight lease to fail")
+        } catch {
+            #expect(error.localizedDescription
+                .contains("closed while it was starting"))
+        }
+        do {
+            _ = try await second
+            Issue.record("expected the queued lease to be refused")
+        } catch {
+            #expect(error.localizedDescription.contains("shutting down"))
+        }
+        do throws(ElsewhereError) {
+            _ = try await tunnel.lease()
+            Issue.record("expected a post-shutdown lease to be refused")
+        } catch {
+            #expect(error.localizedDescription.contains("shutting down"))
+        }
+        #expect(opens.value == 1) // the queued and later leases never opened
+    }
+
     /// The config is re-read per call: exits added between leases reopen the
     /// session when nothing is in flight.
     @Test func aChangedExitSetReopensTheSession() async throws {
