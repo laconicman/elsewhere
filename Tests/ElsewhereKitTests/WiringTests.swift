@@ -17,10 +17,23 @@ struct WiringTests {
     private struct DesktopManifest: Decodable {
         let version: String
         let server: Server
+        let userConfig: [String: Option]
         struct Server: Decodable {
+            let entryPoint: String
             let mcpConfig: MCPConfig
-            struct MCPConfig: Decodable { let args: [String] }
-            enum CodingKeys: String, CodingKey { case mcpConfig = "mcp_config" }
+            struct MCPConfig: Decodable {
+                let command: String
+                let args: [String]
+            }
+            enum CodingKeys: String, CodingKey {
+                case entryPoint = "entry_point"
+                case mcpConfig = "mcp_config"
+            }
+        }
+        struct Option: Decodable { let required: Bool? }
+        enum CodingKeys: String, CodingKey {
+            case version, server
+            case userConfig = "user_config"
         }
     }
 
@@ -42,6 +55,19 @@ struct WiringTests {
             DesktopManifest.self, at: "desktop-extension/manifest.json")
         #expect(manifest.version == Elsewhere.version)
         #expect(manifest.server.mcpConfig.args.first == "serve")
+    }
+
+    /// The `.mcpb` launches the SETUP path itself: Claude Desktop substitutes `${HOME}` in
+    /// `mcp_config`, not inside a `user_config` default (modelcontextprotocol/mcpb#251), and
+    /// its install form would not take an empty optional field (observed 2026-10-24) — so
+    /// every option it offers is required and holds a value.
+    @Test func desktopManifestLaunchesTheSetupPath() throws {
+        let manifest = try Self.decoded(
+            DesktopManifest.self, at: "desktop-extension/manifest.json")
+        let path = "${HOME}/.local/bin/elsewhere"
+        #expect(manifest.server.entryPoint == path)
+        #expect(manifest.server.mcpConfig.command == path)
+        #expect(manifest.userConfig.values.allSatisfy { $0.required == true })
     }
 
     /// The Claude Code plugin: same version, and its `.mcp.json` launches

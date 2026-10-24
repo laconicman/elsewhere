@@ -35,6 +35,8 @@ spike session (S5, issue #1) is landed — **M2 is next.**
 - **#17** ([#10](https://github.com/laconicman/elsewhere/issues/10)):
   `~` expansion, the thin `.mcpb`, the Claude Code plugin with the `elsewhere`
   skill, `SETUP.md`, registrations, `0.1.0`.
+- **#19**: the `.mcpb` launches `~/.local/bin/elsewhere` itself (mcpb#251),
+  one knob; TD-8.
 
 Then the `0.1.0` tag by the GitHubWorkflow recipe.
 
