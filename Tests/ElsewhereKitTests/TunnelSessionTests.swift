@@ -28,6 +28,18 @@ struct TunnelSessionTests {
                 == .external(exit: "incy", url: URL(string: "http://127.0.0.1:18080")!))
     }
 
+    /// `serve`'s reopen check: a proxy-only session has no engine to die — it is
+    /// alive; a supervisor that never started is not.
+    @Test func livenessReportsWhatTheEngineBecame() async throws {
+        let supervisor = TunnelSupervisor()
+        let session = try await TunnelSession.open(
+            config: config(), exits: ["incy"], includeDirect: false,
+            bindInterface: .auto, log: .silent, supervisor: supervisor)
+        #expect(await session.isAlive)
+        #expect(!(await supervisor.isAlive))
+        await session.close()
+    }
+
     @Test func autoWithNoInterfaceIsATunnelErrorNotAQuietUnbind() async {
         do {
             _ = try await TunnelSession.open(
