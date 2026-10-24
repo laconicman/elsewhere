@@ -402,6 +402,20 @@ struct RendererTests {
         #expect(rendered.contains("9. x\n10. y"))
     }
 
+    /// A `start`/`value` outside HTML's `long` is invalid, not a trap: the
+    /// counter falls back and `Int.max` never feeds `number += 1`.
+    @Test func hugeListCountersAreIgnoredNotTrapped() {
+        let rendered = Renderer.render(
+            "<body><ol start=\"9223372036854775807\"><li>x</li><li>y</li></ol>"
+                + "<ol start=\"2147483647\"><li>x</li><li>y</li></ol>"
+                + "<ol><li value=\"9223372036854775807\">x</li><li>y</li></ol></body>",
+            contentType: "text/html",
+            finalURL: URL(string: "https://example.com")!, format: .markdown)
+        // Both out-of-range lists fell back — "1. x\n2. y" occurs twice.
+        #expect(rendered.components(separatedBy: "1. x\n2. y").count - 1 == 2)
+        #expect(rendered.contains("2147483647. x\n2147483648. y"))
+    }
+
     /// Text around a nested list keeps document order: before → item line,
     /// nested items, after → a continuation paragraph at the text column after
     /// a blank line (no blank line and it joins the last nested item).

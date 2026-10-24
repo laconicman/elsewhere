@@ -310,15 +310,12 @@ extension Renderer {
     ) -> [String] {
         var lines: [String] = []
         // ol[start] seeds the counter; numbering continues from the emitted value.
-        var number = ordered
-            ? ((try? list.attr("start"))
-                .flatMap { Int($0.trimmingCharacters(in: .whitespaces)) } ?? 1)
-            : 1
+        var number = ordered ? listNumber(try? list.attr("start")) ?? 1 : 1
         for child in list.children() where child.tagName() == "li" {
-            if ordered,
-                let value = (try? child.attr("value"))
-                    .flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) })
-            { number = value } // li[value] overrides; the next item counts on
+            // li[value] overrides; the next item counts on
+            if ordered, let value = listNumber(try? child.attr("value")) {
+                number = value
+            }
             let bullet = ordered ? "\(number). " : "- "
             number += 1
             let column = indent + String(repeating: " ", count: bullet.count)
@@ -417,6 +414,13 @@ extension Renderer {
             }
         }
         return lines.isEmpty ? [] : [lines.joined(separator: "\n")]
+    }
+
+    /// `ol[start]`/`li[value]` as HTML reads them — the IDL attributes are `long`s
+    /// (WHATWG HTML §4.4.5), so an integer outside 32 bits is invalid and ignored.
+    /// A 32-bit seed also keeps the `Int` counter from overflowing on `+= 1`.
+    private static func listNumber(_ attribute: String?) -> Int? {
+        attribute.flatMap { Int32($0.trimmingCharacters(in: .whitespaces)) }.map(Int.init)
     }
 
     /// Fenced code: ` ```language `, content verbatim, ` ``` `. The language comes
