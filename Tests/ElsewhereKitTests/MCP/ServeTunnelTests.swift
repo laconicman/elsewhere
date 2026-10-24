@@ -98,6 +98,31 @@ struct ServeTunnelTests {
         await tunnel.close(reason: "eof")
     }
 
+    /// The SDK runs every tool call in its own task: two leases arriving while
+    /// `open` is still suspended must share the one attempt — a second `open`
+    /// would collide on the one Go runtime ("already in use").
+    @Test func concurrentLeasesShareOneOpen() async throws {
+        let opens = Opens()
+        let tunnel = ServeTunnel(
+            store: try store(), environment: [:],
+            options: ServeOptions(idleStop: nil)
+        ) { config, _, _ throws(ElsewhereError) -> TunnelSession in
+            opens.bump()
+            try? await Task.sleep(for: .milliseconds(200))
+            return try await TunnelSession.open(
+                config: config, exits: Set(config.exits.keys), includeDirect: false,
+                bindInterface: .none, log: .silent)
+        }
+        async let one = tunnel.lease()
+        async let two = tunnel.lease()
+        let (first, second) = try await (one, two)
+        #expect(opens.value == 1)
+        #expect(first.session === second.session)
+        await tunnel.release()
+        await tunnel.release()
+        await tunnel.close(reason: "eof")
+    }
+
     /// A failed start backs off: a lease inside the window is refused without a
     /// second open attempt.
     @Test func aFailedStartBacksOff() async throws {

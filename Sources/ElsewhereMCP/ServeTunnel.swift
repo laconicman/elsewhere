@@ -34,6 +34,14 @@ actor ServeTunnel {
 
     private var session: TunnelSession?
     private var sessionExits: Set<String> = []
+    /// The in-flight `open`, if any — actors reenter across an `await`, so a
+    /// second `lease` during a start must share the attempt, not start its own
+    /// (the engine is one Go runtime: two opens collide — "already in use").
+    private var startTask: Task<Result<TunnelSession, ElsewhereError>, Never>?
+    /// Bumped by every `close`: a `start` that resolves against a stale
+    /// generation closes its fresh session unborn rather than resurrecting one
+    /// after the teardown.
+    private var generation = 0
     private var inFlight = 0
     private var lastUsed = ContinuousClock.now
     private var idleTask: Task<Void, Never>?
@@ -98,34 +106,72 @@ actor ServeTunnel {
     }
 
     /// Stops the held session; idempotent, and only a session that was up earns
-    /// the `down` row.
+    /// the `down` row. An open still in flight is awaited and closed too — the
+    /// generation bump stops its `start` from resurrecting the session after.
     func close(reason: String) async {
         idleTask?.cancel()
         idleTask = nil
-        guard let held = session else { return }
+        generation += 1
+        var held = session
         session = nil
         sessionExits = []
+        if let pending = startTask {
+            if case .success(let opened) = await pending.value { held = opened }
+            startTask = nil
+        }
+        guard let held else { return }
         await held.close()
         tsv?.log(event: "down", exit: reason)
     }
 
     /// One start attempt and its TSV edges — `up` carries the lane count the
     /// session was asked for (every exit + direct); a failure arms the backoff
-    /// window before the error propagates.
+    /// window before the error propagates. A second `lease` while the attempt
+    /// runs awaits the same `startTask` and shares its outcome — success or
+    /// failure — without a second `open` or a second arm.
     private func start(
         _ config: ElsewhereConfig, names: Set<String>
     ) async throws(ElsewhereError) -> TunnelSession {
-        do {
-            let opened = try await open(
-                config, options.viaSystem ? .none : config.bindInterface,
-                options.log)
+        if let pending = startTask {
+            let gen = generation
+            switch await pending.value {
+            case .success(let opened):
+                guard generation == gen else {
+                    throw .tunnel("the tunnel closed while it was starting")
+                }
+                return opened
+            case .failure(let error):
+                throw error
+            }
+        }
+        let gen = generation
+        let attempt = Task<Result<TunnelSession, ElsewhereError>, Never> {
+            do throws(ElsewhereError) {
+                return .success(try await open(
+                    config, options.viaSystem ? .none : config.bindInterface,
+                    options.log))
+            } catch {
+                return .failure(error)
+            }
+        }
+        startTask = attempt
+        switch await attempt.value {
+        case .success(let opened):
+            startTask = nil
+            guard generation == gen else {
+                // Closed underneath the open — the session dies unborn rather
+                // than resurrecting after the teardown (close is idempotent).
+                await opened.close()
+                throw .tunnel("the tunnel closed while it was starting")
+            }
             session = opened
             sessionExits = names
             backoff = .seconds(1)
             backoffUntil = nil
             tsv?.log(event: "up", exit: "\(names.count + 1)")
             return opened
-        } catch {
+        case .failure(let error):
+            startTask = nil
             backoffUntil = .now + backoff
             backoff = Swift.min(backoff + backoff, .seconds(30))
             tsv?.log(
