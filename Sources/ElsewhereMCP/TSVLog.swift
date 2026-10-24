@@ -20,11 +20,13 @@ final class TSVLog: Sendable {
         let fileManager = FileManager.default
         let directory = path.deletingLastPathComponent()
         do {
-            try fileManager.createDirectory(
-                at: directory, withIntermediateDirectories: true,
-                attributes: [.posixPermissions: 0o700])
-            try fileManager.setAttributes(
-                [.posixPermissions: 0o700], ofItemAtPath: directory.path)
+            // Only a directory we create gets tightened — an existing one
+            // (`/tmp`, a Desktop folder) is the user's, never chmodded.
+            if !fileManager.fileExists(atPath: directory.path) {
+                try fileManager.createDirectory(
+                    at: directory, withIntermediateDirectories: true,
+                    attributes: [.posixPermissions: 0o700])
+            }
             if !fileManager.fileExists(atPath: path.path) {
                 guard fileManager.createFile(
                     atPath: path.path, contents: nil,
