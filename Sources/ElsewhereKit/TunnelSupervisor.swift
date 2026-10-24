@@ -186,7 +186,12 @@ public actor TunnelSupervisor {
 
     /// Stops the engine if it is running *and owned by this supervisor*; never
     /// throws — the caller is tearing down and a stuck core is logged, not fatal.
-    /// Another session's core is neither stopped nor released here.
+    /// Another session's core is neither stopped nor released here. Ownership is
+    /// released even when the engine refuses to stop: the next `start` in this
+    /// process treats the still-running core as a leftover and stops it before
+    /// its own run (and refuses to run on a floor it could not clear). A dead
+    /// holder keeping the engine would refuse every later session for the life
+    /// of the process — the long-lived `serve` of M2 most of all.
     public func stop() async {
         let me = ObjectIdentifier(self)
         let mine = Self.owner.withLock { $0 == me }
