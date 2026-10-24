@@ -47,9 +47,9 @@ actor ServeTunnel {
 
     private var session: TunnelSession?
     private var sessionRouting: Routing?
-    /// The in-flight `open`, if any — actors reenter across an `await`, so a
-    /// second `lease` during a start must share the attempt, not start its own
-    /// (the engine is one Go runtime: two opens collide — "already in use").
+    /// The in-flight `open`, if any — for `close`, which at EOF or on a signal
+    /// awaits the attempt and stops what it opened. No lease joins it: leases
+    /// take turns, and the engine is one Go runtime — two opens would collide.
     private var startTask: Task<Result<TunnelSession, ElsewhereError>, Never>?
     /// Bumped by every `close`: a `start` that resolves against a stale
     /// generation closes its fresh session unborn rather than resurrecting one
@@ -60,6 +60,15 @@ actor ServeTunnel {
     private var idleTask: Task<Void, Never>?
     private var backoff: Duration = .seconds(1)
     private var backoffUntil: ContinuousClock.Instant?
+    /// Leases decide one at a time: the decision spans awaits (`isAlive`,
+    /// `close`, `open`) and an actor reenters across each, so two leases after
+    /// a config change would both find the old session, both pass
+    /// `inFlight == 0` and both reopen — the second `close` killing the first's
+    /// start. The next lease waits for the current decision and decides on the
+    /// state it left; `idleExpired` takes the same turn, so its `inFlight == 0`
+    /// is read with no lease mid-decision.
+    private var deciding = false
+    private var waiting: [CheckedContinuation<Void, Never>] = []
 
     init(
         store: ConfigStore, environment: [String: String], options: ServeOptions,
@@ -79,11 +88,26 @@ actor ServeTunnel {
         self.open = open
     }
 
+    private func takeTurn() async {
+        if deciding {
+            await withCheckedContinuation { waiting.append($0) }
+        } else { deciding = true }
+    }
+
+    private func endTurn() {
+        if waiting.isEmpty { deciding = false } else { waiting.removeFirst().resume() }
+    }
+
     /// The session for one call — opened, reused or reopened per the rules on
     /// the type; the caller must `release()` on every path.
     /// - Throws: `.config` when the file can't be read, `.tunnel` while the
     ///   backoff window stands, and whatever `open` throws on a fresh start.
     func lease() async throws(ElsewhereError) -> Lease {
+        await takeTurn()
+        defer { endTurn() }
+        // Inside the turn: a config read before it could predate the reopen
+        // the previous decision just did, and a backoff check before it could
+        // let a waiter start right after the failure it should back off from.
         let config = try store.load(environment: environment)
         if let until = backoffUntil, ContinuousClock.now < until {
             throw .tunnel(
@@ -139,24 +163,13 @@ actor ServeTunnel {
 
     /// One start attempt and its TSV edges — `up` carries the lane count the
     /// session was asked for (every exit + direct); a failure arms the backoff
-    /// window before the error propagates. A second `lease` while the attempt
-    /// runs awaits the same `startTask` and shares its outcome — success or
-    /// failure — without a second `open` or a second arm.
+    /// window before the error propagates. Only a lease holding the turn
+    /// reaches `start`, so no second `lease` joins mid-attempt; `startTask`
+    /// stays because `close` at EOF or on a signal still awaits and stops an
+    /// in-flight open — the generation check covers that case.
     private func start(
         _ config: ElsewhereConfig, routing: Routing
     ) async throws(ElsewhereError) -> TunnelSession {
-        if let pending = startTask {
-            let gen = generation
-            switch await pending.value {
-            case .success(let opened):
-                guard generation == gen else {
-                    throw .tunnel("the tunnel closed while it was starting")
-                }
-                return opened
-            case .failure(let error):
-                throw error
-            }
-        }
         let gen = generation
         let attempt = Task<Result<TunnelSession, ElsewhereError>, Never> {
             do throws(ElsewhereError) {
@@ -209,6 +222,8 @@ actor ServeTunnel {
     }
 
     private func idleExpired() async {
+        await takeTurn()
+        defer { endTurn() }
         guard inFlight == 0, let idle = options.idleStop else { return }
         guard ContinuousClock.now - lastUsed >= idle else {
             armIdleTimer()

@@ -269,15 +269,17 @@ first call that needs a route — with every Xray lane *and* `direct`, so switch
 never restarts the core. Where the CLI opens only the lanes a call needs (A9), a server
 pays one Go start and reuses it across calls and exits. The config is re-read per call:
 when an exit changed — added, removed or edited — or the bind interface did, and
-nothing is in flight, the session is reopened on that
-call; while a call runs, the current session serves and a name the file just gained
-gets the Kit's `.exit` — the next call picks it up. A dead engine (``TunnelSession/isAlive``
-false) reopens the same way, and a failed start backs off 1 s doubling to 30 s — a call
-inside the window is refused without a new attempt. The engine stops after `--idle-stop`
-minutes of no calls (default 10, `0` = never), counted from the last call's end — never
-while a call is in flight — and restarts on demand. There is no warm-up probe (A7 holds:
-the fetch is the probe; `elsewhere_whoami` is the probe when wanted). stdout is the
-protocol, so the engine log defaults to a file —
+nothing is in flight, the session is reopened on that call; while a call runs, the
+current session serves and a name the file just gained gets the Kit's `.exit` — the
+next call picks it up. A dead engine (``TunnelSession/isAlive`` false) reopens the same
+way, and a failed start backs off 1 s doubling to 30 s — a call inside the window is
+refused without a new attempt. The SDK runs tool calls concurrently (C6), so that
+decision — reuse, reopen or refuse — is taken one call at a time: a call arriving
+mid-decision waits for it and decides on the state it left. The engine stops after
+`--idle-stop` minutes of no calls (default 10, `0` = never), counted from the last call's
+end — never while a call is in flight — and restarts on demand. There is no warm-up probe
+(A7 holds: the fetch is the probe; `elsewhere_whoami` is the probe when wanted). stdout
+is the protocol, so the engine log defaults to a file —
 `~/Library/Logs/elsewhere/xray.log`, in a 0700 directory at 0600 — when neither
 `--xray-log` nor `ELSEWHERE_XRAY_LOG` is given, and `--log-tsv` keeps an audit row per
 call and per lifecycle edge. **Rejected:** a session per call — a cold Go start per

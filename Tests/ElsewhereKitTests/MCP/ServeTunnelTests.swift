@@ -123,6 +123,46 @@ struct ServeTunnelTests {
         await tunnel.close(reason: "eof")
     }
 
+    /// Leases decide one at a time: four landing after the file changed must
+    /// not all find the stale session and reopen over each other — the second
+    /// one's `close` would kill the first one's pending start.
+    @Test func concurrentLeasesAfterAChangeShareOneReopen() async throws {
+        let opens = Opens()
+        let store = try store()
+        let tunnel = ServeTunnel(
+            store: store, environment: [:],
+            options: ServeOptions(idleStop: nil)
+        ) { config, _, _ throws(ElsewhereError) -> TunnelSession in
+            opens.bump()
+            try? await Task.sleep(for: .milliseconds(200))
+            return try await TunnelSession.open(
+                config: config, exits: Set(config.exits.keys), includeDirect: false,
+                bindInterface: .none, log: .silent)
+        }
+        let first = try await tunnel.lease()
+        _ = first
+        await tunnel.release()
+        try store.save(ElsewhereConfig(exits: [
+            "p": .proxy(URL(string: "http://127.0.0.1:1")!),
+            "q": .proxy(URL(string: "http://127.0.0.1:2")!),
+        ]))
+        async let one = tunnel.lease()
+        async let two = tunnel.lease()
+        async let three = tunnel.lease()
+        async let four = tunnel.lease()
+        let leases = try await (one, two, three, four)
+        #expect(opens.value == 2)
+        #expect(leases.0.session !== first.session)
+        #expect(leases.0.session === leases.1.session)
+        #expect(leases.0.session === leases.2.session)
+        #expect(leases.0.session === leases.3.session)
+        await tunnel.release()
+        await tunnel.release()
+        await tunnel.release()
+        await tunnel.release()
+        await tunnel.close(reason: "eof")
+    }
+
     /// A failed start backs off: a lease inside the window is refused without a
     /// second open attempt.
     @Test func aFailedStartBacksOff() async throws {
