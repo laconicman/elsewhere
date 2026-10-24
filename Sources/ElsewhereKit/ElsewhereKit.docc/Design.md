@@ -307,6 +307,25 @@ lifecycle. If a host without a shell ever needs it, it belongs in a separate too
 profile, off by default, with an allowlist of commands (devin-kick's profile
 pattern) — not in the default server.
 
+## Registration surfaces are thin pointers to one binary
+
+Every host registration — the Claude Desktop `.mcpb`, the Claude Code plugin, the Devin
+Desktop entry, the generic stdio snippet — points at one `elsewhere` binary the owner
+built and placed on a stable path; none bundles it. **Why:** a compiled Swift binary is
+per-architecture and, embedded in a `.mcpb`, frozen inside Desktop's private extension
+folder — invisible to the other hosts and stale the moment the owner rebuilds. One
+binary, symlinked into `~/.local/bin` (no sudo) or `/usr/local/bin`, serves every host and
+follows each `swift build -c release`. The surfaces carry only what a host cannot discover
+at runtime — the path and `serve`'s flags; the tools are listed live (`tools_generated`).
+Hosts write their configs in JSON, which no shell expands, so the path options and
+variables (`--config`/`ELSEWHERE_CONFIG`, `--xray-log`/`ELSEWHERE_XRAY_LOG`, `--log-tsv`)
+expand a leading `~` themselves (C7). The `elsewhere` skill ("try Elsewhere first") gives
+an agent the route the inaccessible-sources rule lacks: a step 0 before inferring or
+asking. **Rejected:** bundling the binary in the `.mcpb` (deepwiki-mcp's precedent and
+reasoning); a Homebrew formula (a tap for an audience of one); `ELSEWHERE_LINK` in a host
+config — the secret would sit in plain text beside other servers' settings, where
+`exits add --link -` keeps it in the 0600 file.
+
 ## See Also
 
 - <doc:Roadmap>

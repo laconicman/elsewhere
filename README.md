@@ -24,10 +24,10 @@ bypass the system tunnel that owns the default route.
 
 ## Status
 
-**M2 (serve) landed** — this build has the config model, `exits`, `doctor`,
+**0.1.0 — M2 complete**: config model, `exits`, `doctor`,
 `fetch`/`whoami`/`run` with Markdown rendering and paging, and `elsewhere serve`, the
-MCP stdio server (below). The first tag, `0.1.0`, is cut when M2's PRs are merged and
-the registration recipes ship; M1 has no tag.
+MCP stdio server; registration recipes for Claude Code, Claude Desktop (`.mcpb`),
+Devin Desktop and any stdio host are in [SETUP.md](SETUP.md).
 
 ## Requirements
 
@@ -39,8 +39,11 @@ Xcode 27 (Swift 6.4 tools) and macOS 15.
 git clone https://github.com/laconicman/elsewhere
 cd elsewhere
 swift build -c release
-install .build/release/elsewhere /usr/local/bin/elsewhere
+mkdir -p ~/.local/bin && ln -sf "$PWD/.build/release/elsewhere" ~/.local/bin/elsewhere
 ```
+
+The symlink follows every later release build; `/usr/local/bin` with `sudo` works too.
+[SETUP.md](SETUP.md) has the full build-and-register recipe.
 
 ## Configure
 
@@ -166,8 +169,8 @@ exit lane plus `direct` — and stops after `--idle-stop MIN` of no calls (defau
 call; `--via-system` unbinds the engine to the system path; `--log-tsv PATH` appends
 an audit row per call and per tunnel lifecycle edge; `--xray-log`/`ELSEWHERE_XRAY_LOG`
 redirect the engine log — serve's default is `~/Library/Logs/elsewhere/xray.log`,
-since stdout is the protocol. Registration recipes for agent hosts come with
-SETUP.md (the next PR).
+since stdout is the protocol. Registration recipes for Claude Code, Claude Desktop
+(`.mcpb`), Devin Desktop and any stdio host: [SETUP.md](SETUP.md).
 
 ## Exit status
 
