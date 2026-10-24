@@ -6,7 +6,9 @@ import Synchronization
 /// PATH lookup for free.
 public enum ChildRunner {
     /// The child's environment: the parent's, plus the four proxy variables (upper and
-    /// lower case — tools disagree) and `NO_PROXY` so loopback stays direct.
+    /// lower case — tools disagree) and `NO_PROXY` — the parent's bypass list with
+    /// loopback added, so an internal host the parent keeps off a proxy stays off
+    /// ours (the exit could not resolve it anyway).
     ///
     /// An `inbound` route advertises `http://127.0.0.1:PORT` for HTTP(S) and
     /// `socks5h://127.0.0.1:PORT` for `ALL_PROXY` — the `mixed` inbound speaks both,
@@ -31,9 +33,27 @@ public enum ChildRunner {
         environment["https_proxy"] = http
         environment["ALL_PROXY"] = all
         environment["all_proxy"] = all
-        environment["NO_PROXY"] = "localhost,127.0.0.1,::1"
-        environment["no_proxy"] = "localhost,127.0.0.1,::1"
+        let bypass = bypassList(from: base)
+        environment["NO_PROXY"] = bypass
+        environment["no_proxy"] = bypass
         return environment
+    }
+
+    /// What `NO_PROXY` carries whatever the parent says: loopback stays direct.
+    static let loopbackBypass = ["localhost", "127.0.0.1", "::1"]
+
+    /// The parent's bypass lists (both spellings, in order, trimmed, de-duplicated)
+    /// plus loopback — one value for both spellings.
+    static func bypassList(from base: [String: String]) -> String {
+        let inherited = ["NO_PROXY", "no_proxy"]
+            .flatMap { (base[$0] ?? "").split(separator: ",") }
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+        var entries: [String] = []
+        for entry in inherited + loopbackBypass
+        where !entry.isEmpty && !entries.contains(entry) {
+            entries.append(entry)
+        }
+        return entries.joined(separator: ",")
     }
 
     /// Runs `command` with the route's environment; returns the child's exit status —

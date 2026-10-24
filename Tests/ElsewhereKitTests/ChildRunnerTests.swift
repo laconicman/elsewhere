@@ -32,6 +32,31 @@ struct ChildRunnerTests {
         #expect(env["NO_PROXY"] == "localhost,127.0.0.1,::1")
     }
 
+    /// The parent's bypass list survives and gains loopback — an internal host
+    /// the parent keeps off a proxy stays off ours; the exit could not resolve
+    /// it anyway.
+    @Test func aParentBypassListSurvivesAndGainsLoopback() {
+        let env = ChildRunner.environment(
+            for: .inbound(exit: "x", port: 10801),
+            base: [
+                "NO_PROXY": "git.corp.example, 10.0.0.0/8",
+                "no_proxy": "localhost,wiki.corp.example",
+            ])
+        for key in ["NO_PROXY", "no_proxy"] {
+            #expect(env[key] == "git.corp.example,10.0.0.0/8,localhost,"
+                + "wiki.corp.example,127.0.0.1,::1")
+        }
+    }
+
+    /// An empty parent list contributes nothing — loopback alone.
+    @Test func anEmptyBypassListIsJustLoopback() {
+        let env = ChildRunner.environment(
+            for: .inbound(exit: "x", port: 10801), base: ["NO_PROXY": ""])
+        for key in ["NO_PROXY", "no_proxy"] {
+            #expect(env[key] == "localhost,127.0.0.1,::1")
+        }
+    }
+
     @Test func trueExitsZero() async throws {
         let status = try await ChildRunner.run(
             ["/usr/bin/true"], via: .inbound(exit: "t", port: 9))
