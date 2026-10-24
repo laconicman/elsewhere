@@ -141,6 +141,15 @@ public enum Redactor {
         return components.string ?? marker
     }
 
+    /// URLs embedded in free text lose their userinfo — `scheme://user:pass@host` →
+    /// `scheme://host` — the rule `redact(url:)` applies to a URL value, for header
+    /// values (`Location`, `Link`, `Content-Location`, `Refresh`) that are text on the
+    /// wire. Greedy to the last `@` before the authority ends, so an unencoded `@`
+    /// inside the credentials leaves nothing behind.
+    public static func redactUserinfo(in text: String) -> String {
+        text.replacing(/([A-Za-z][A-Za-z0-9+.-]*:\/\/)[^\s\/?#<>"']*@/) { String($0.output.1) }
+    }
+
     /// The secret values a link carries — the userinfo (a VLESS UUID, a trojan password)
     /// plus every `secretLinkKeys` value present, in BOTH decoded and percent-encoded
     /// form (`p@ss` and `p%40ss`): an engine error can echo either spelling, so the

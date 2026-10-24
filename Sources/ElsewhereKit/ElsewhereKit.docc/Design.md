@@ -114,8 +114,8 @@ is the probe; `serve` may warm up at M2).
 a `sed`. Status lines, truncation and binary notices, and the `HTTP <status>` note go
 to stderr; `--json` replaces the body with the whole result object when a caller wants
 structure. Printed URLs — the JSON fields, the redirect list, the stderr note — keep
-scheme, host, path and query but never userinfo: where a request went is data, a
-credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
+scheme, host, path and query but never userinfo, and so do URL-shaped header values
+(`Location`, `Link`): where a request went is data, a credential in it is not. HTTP ≥ 400 is a *result* — the command exits 0 — because
 the status is data
 the agent reads (§5.5). **Rejected:** stderr-and-no-body on errors (loses the page's
 own error body) and a JSON envelope by default (most calls want the page).

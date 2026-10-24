@@ -48,6 +48,18 @@ struct FetcherTests {
         }
     }
 
+    /// A `Location`-style header can carry `user:pass@` — every header value is
+    /// scrubbed the way a printed URL is, so `--json` and `--head` never show it.
+    @Test func urlShapedHeadersLoseTheirUserinfo() async throws {
+        try await withServerAndRoute { route, base in
+            let result = try await Fetcher.fetch(
+                request(base.appendingPathComponent("userinfo")), via: route)
+            #expect(result.headers["content-location"] == "http://127.0.0.1/x")
+            #expect(result.headers["link"] == #"<http://127.0.0.1/n>; rel="next""#)
+            #expect(result.headers.values.allSatisfy { !$0.contains("secret") })
+        }
+    }
+
     @Test func aBodyOverTheCapIsCutAndFlagged() async throws {
         try await withServerAndRoute { route, base in
             let result = try await Fetcher.fetch(

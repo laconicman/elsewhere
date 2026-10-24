@@ -106,6 +106,12 @@ final class TestHTTPServer: Sendable {
         case (_, "/bin"):
             send("200 OK", contentType: "application/octet-stream",
                  body: Data([0x00, 0x9F, 0x10, 0x42]), headOnly: false, on: connection)
+        case (_, "/userinfo"):
+            send("200 OK",
+                 headers: ["Content-Location: http://user:secret@127.0.0.1/x",
+                           "Link: <http://user:secret@127.0.0.1/n>; rel=\"next\""],
+                 contentType: "text/plain",
+                 body: Data("ok".utf8), headOnly: false, on: connection)
         case (_, "/redir"):
             send("302 Found", headers: ["Location: /ok"], body: Data(), on: connection)
         case (_, "/loop"):
