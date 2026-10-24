@@ -67,9 +67,10 @@ Same binary, every host:
 
 - **Claude Desktop** — build `elsewhere.mcpb` with
   [`desktop-extension/build.sh`](desktop-extension/build.sh), then **Settings →
-  Extensions** → drag it in. The installer asks for the binary path (default
-  `~/.local/bin/elsewhere`), the idle minutes and an optional engine log file —
-  the bundle carries no binary of its own (see
+  Extensions** → drag it in. The installer asks only for the idle minutes: the
+  bundle launches the §2 path `~/.local/bin/elsewhere` itself (Claude Desktop
+  does not expand `${HOME}` inside a user-configurable default — mcpb#251 — so
+  the path is fixed in the manifest, TD-8) and carries no binary of its own (see
   [`desktop-extension/README.md`](desktop-extension/README.md)). If the tools
   don't appear, fully quit and reopen Desktop.
 
