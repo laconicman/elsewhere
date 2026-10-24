@@ -181,14 +181,17 @@ actor ServeTunnel {
         }
     }
 
-    /// One task sleeping `idleStop` from the last release; on expiry it closes
-    /// only if nothing is in flight and the idle stretch truly elapsed, else
-    /// re-arms for the remainder.
+    /// One task sleeping until `lastUsed + idleStop`; on expiry it closes only
+    /// if nothing is in flight and the idle stretch truly elapsed, else re-arms
+    /// for the remainder. A cancelled sleep returns early — only the live timer
+    /// reaches `idleExpired`, so a stale arm can't cancel its successor and spin.
     private func armIdleTimer() {
         idleTask?.cancel()
         guard let idle = options.idleStop else { return }
+        let deadline = lastUsed + idle
         idleTask = Task { [weak self] in
-            try? await Task.sleep(for: idle)
+            do { try await Task.sleep(until: deadline, clock: .continuous) }
+            catch { return }
             await self?.idleExpired()
         }
     }
