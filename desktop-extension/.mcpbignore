@@ -1,0 +1,5 @@
+# The bundle needs only manifest.json (this is a thin, binary-less extension).
+# These are repo docs/tooling, not part of the installable artifact.
+README.md
+build.sh
+.mcpbignore

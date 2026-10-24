@@ -29,12 +29,14 @@ spike session (S5, issue #1) is landed — **M2 is next.**
 
 ## M2 · serve and wiring — 0.1.0
 
-`elsewhere serve`: an MCP stdio server with `elsewhere_fetch`/`elsewhere_whoami`/
-`elsewhere_exits`, lazy tunnel start and idle stop ([#9](https://github.com/laconicman/elsewhere/issues/9));
-registration everywhere the owner runs an agent — Devin Desktop, Claude Code,
-Claude Desktop `.mcpb`, the "try Elsewhere first" skill
-([#10](https://github.com/laconicman/elsewhere/issues/10)). Then the `0.1.0` tag by the
-GitHubWorkflow recipe.
+- **#16** ([#9](https://github.com/laconicman/elsewhere/issues/9)):
+  `elsewhere serve`, the three tools, `ServeTunnel` (lazy start, idle stop,
+  backoff, reopen, turns), `TSVLog`.
+- **#17** ([#10](https://github.com/laconicman/elsewhere/issues/10)):
+  `~` expansion, the thin `.mcpb`, the Claude Code plugin with the `elsewhere`
+  skill, `SETUP.md`, registrations, `0.1.0`.
+
+Then the `0.1.0` tag by the GitHubWorkflow recipe.
 
 ## M3 · dogfood fixes — 0.2.0
 
