@@ -14,6 +14,14 @@ struct OwnStdoutTests {
         #expect(OwnStdout.handle === FileHandle.standardOutput)
     }
 
+    /// A log path that cannot be opened is reported, not silently skipped — before any
+    /// descriptor moves.
+    @Test func sinkRefusesAnUnwritablePath() {
+        #expect(throws: ElsewhereError.self) {
+            try OwnStdout.sink(to: "/nonexistent-elsewhere-dir/xray.log")
+        }
+    }
+
     @Test func noSourceWritesToDescriptorOneDirectly() throws {
         let files = try #require(FileManager.default.enumerator(at: Self.sources, includingPropertiesForKeys: nil))
         var offenders: [String] = []

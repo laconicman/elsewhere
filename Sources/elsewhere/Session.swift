@@ -16,7 +16,9 @@ enum Session {
         let log = tunnel.log
         // `--xray-log`/ELSEWHERE_XRAY_LOG doubles as the sink for the engine's
         // parse-time lines — the one shared place, so every fetch-like command
-        // gets it (doctor takes no log option; the sink stays `/dev/null`).
+        // gets it; an unwritable path fails here, for every route, rather than
+        // only when an exit happens to need the engine (doctor takes no log
+        // option; its sink stays `/dev/null`).
         if case .file(let path) = log { try OwnStdout.sink(to: path) }
         let session = try await TunnelSession.open(
             config: config, exits: names, includeDirect: includeDirect,
