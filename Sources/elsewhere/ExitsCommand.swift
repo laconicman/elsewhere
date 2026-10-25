@@ -37,8 +37,10 @@ struct ExitsAdd: AsyncParsableCommand {
         abstract: "Add an exit. Pass `--link -` to read the link from stdin — it stays out of shell history.",
         discussion: """
         Exactly one source: --link 'vless://…' (or `-` for stdin), --xray FILE (a raw
-        outbound object, flat or classic shape — `{"outbounds":[…]}` is unwrapped), or
-        --proxy URL (http/https/socks5(h), a local proxy used as an exit, no Xray).
+        outbound object, flat or classic shape; `{"outbounds":[…]}` is unwrapped — a
+        whole client config too, keeping its one proxy outbound and dropping the
+        engine's `direct`/`block`/`dns` plumbing), or --proxy URL
+        (http/https/socks5(h), a local proxy used as an exit, no Xray).
         """
     )
 
@@ -48,7 +50,7 @@ struct ExitsAdd: AsyncParsableCommand {
     @Option(help: "A share link; `-` reads one line from stdin (keeps the secret out of shell history).")
     var link: String?
 
-    @Option(help: "A file with a raw Xray outbound object as JSON.")
+    @Option(help: "A file with a raw Xray outbound object — or a whole client config with one proxy outbound.")
     var xray: String?
 
     @Option(help: "A local proxy URL used as an exit (e.g. http://127.0.0.1:10808 for INCY).")

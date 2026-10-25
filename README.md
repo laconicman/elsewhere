@@ -55,7 +55,7 @@ through the engine *before* it is saved, so a typo fails at `add`, not at fetch 
 ```sh
 elsewhere exits add moldova --link -    # paste the vless://… link, Enter
 elsewhere exits add incy --proxy http://127.0.0.1:10808   # reuse a local proxy as an exit
-elsewhere exits add manual --xray outbound.json           # a raw Xray outbound object
+elsewhere exits add manual --xray outbound.json           # a raw outbound, or a whole client config with one proxy
 elsewhere exits list
 ```
 
