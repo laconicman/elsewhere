@@ -31,13 +31,16 @@ public enum OwnStdout {
             let copy = dup(STDOUT_FILENO)
             guard copy >= 0 else { throw .config("cannot duplicate stdout: \(errnoText())") }
             slot = FileHandle(fileDescriptor: copy, closeOnDealloc: false)
+            try redirect(to: "/dev/null")
         }
-        try sink(to: "/dev/null")
     }
 
     /// Points fd 1 at `path` (append, created 0600) — the engine log, so parse-time lines
-    /// land beside the engine's own file log instead of in `/dev/null`.
-    public static func sink(to path: String) throws(ElsewhereError) {
+    /// land beside the engine's own file log instead of in `/dev/null`. A path that cannot
+    /// be opened is an error up front, for every route: the caller asked for that file.
+    public static func sink(to path: String) throws(ElsewhereError) { try redirect(to: path) }
+
+    private static func redirect(to path: String) throws(ElsewhereError) {
         let fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
         guard fd >= 0 else { throw .config("cannot open \(path) as the engine's stdout: \(errnoText())") }
         defer { close(fd) }
