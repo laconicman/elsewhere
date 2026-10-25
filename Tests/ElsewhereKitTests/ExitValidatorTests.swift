@@ -53,6 +53,23 @@ struct ExitValidatorTests {
         #expect(Redactor.summary(of: stored) == "xray vless → proxy.example.com:8443")
     }
 
+    /// `exits add --xray whole-client-config.json`: the engine validates the extracted
+    /// proxy and only that outbound is stored — never the inbounds, routing or dns.
+    @Test func aClientConfigIsStoredAsItsProxyOutbound() async throws {
+        let proxy = try RedactorTests.json(RedactorTests.flatOutbound)
+        let config = JSONValue.object([
+            "inbounds": .array([.object(["protocol": .string("mixed"), "port": .number(10808)])]),
+            "outbounds": .array([
+                proxy,
+                .object(["tag": .string("direct"), "protocol": .string("freedom")]),
+                .object(["tag": .string("block"), "protocol": .string("blackhole")]),
+                .object(["tag": .string("dns-out"), "protocol": .string("dns")]),
+            ]),
+        ])
+        let stored = try await ExitValidator.validate(.xray(config), named: "rugos")
+        #expect(stored == .xray(proxy))
+    }
+
     @Test func aHandEditedWrapperStillSummarizes() async throws {
         // `singleOutbound` in summary: a file edited past `exits add` lists correctly.
         let inner = try RedactorTests.json(RedactorTests.flatOutbound)

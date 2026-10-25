@@ -49,8 +49,62 @@ struct ExitResolverTests {
                 for: .xray(.object(["outbounds": .array([.object([:]), .object([:])])])),
                 named: "w")
             Issue.record("expected a throw")
-        } catch ElsewhereError.exit {
+        } catch ElsewhereError.exit(let message) {
             // expected — a wrapper that is not exactly one outbound is not an outbound
+            #expect(message.contains("none of them a proxy"))
+        } catch {
+            Issue.record("expected .exit, got \(error)")
+        }
+    }
+
+    /// A whole client config (INCY's export, v2rayN's): the proxy beside `direct`, `block`
+    /// and `dns-out` — Xray-core's plumbing outbounds, never the exit.
+    @Test func aClientConfigYieldsItsOneProxyOutbound() async throws {
+        let proxy = try RedactorTests.json(RedactorTests.flatOutbound)
+        let config = JSONValue.object([
+            "inbounds": .array([.object(["protocol": .string("mixed"), "port": .number(10808)])]),
+            "routing": .object(["rules": .array([])]),
+            "dns": .object(["servers": .array([.string("1.1.1.1")])]),
+            "outbounds": .array([
+                proxy,
+                .object(["tag": .string("direct"), "protocol": .string("freedom")]),
+                .object(["tag": .string("block"), "protocol": .string("blackhole")]),
+                .object(["tag": .string("dns-out"), "protocol": .string("dns")]),
+            ]),
+        ])
+        #expect(try await ExitResolver.outbound(for: .xray(config), named: "rugos") == proxy)
+        // `exits list` on a hand-edited whole config reads the proxy, not "invalid".
+        #expect(Redactor.summary(of: .xray(config)) == "xray vless → proxy.example.com:8443")
+    }
+
+    @Test func plumbingOnlyIsAnExitErrorNamingTheProtocols() async {
+        do {
+            _ = try await ExitResolver.outbound(
+                for: .xray(.object(["outbounds": .array([
+                    .object(["tag": .string("direct"), "protocol": .string("freedom")]),
+                    .object(["tag": .string("block"), "protocol": .string("blackhole")]),
+                ])])), named: "w")
+            Issue.record("expected a throw")
+        } catch ElsewhereError.exit(let message) {
+            #expect(message.contains("none of them a proxy"))
+            #expect(message.contains("freedom, blackhole"))
+        } catch {
+            Issue.record("expected .exit, got \(error)")
+        }
+    }
+
+    @Test func twoProxiesIsAnExitErrorNamingTheTags() async {
+        do {
+            _ = try await ExitResolver.outbound(
+                for: .xray(.object(["outbounds": .array([
+                    .object(["tag": .string("fast"), "protocol": .string("vless")]),
+                    .object(["tag": .string("direct"), "protocol": .string("freedom")]),
+                    .object(["tag": .string("spare"), "protocol": .string("trojan")]),
+                ])])), named: "w")
+            Issue.record("expected a throw")
+        } catch ElsewhereError.exit(let message) {
+            #expect(message.contains("2 proxy outbounds"))
+            #expect(message.contains("fast, spare"))
         } catch {
             Issue.record("expected .exit, got \(error)")
         }

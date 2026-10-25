@@ -84,11 +84,15 @@ lazily").
 
 `convertShareLinks` returns this core's **flat** outbound (`settings:{address,port,id,
 encryption}`); a pasted full config usually carries the classic `vnext`/`servers` shape.
-The loader accepts both (C5 §1–2): `.xray` exits unwrap `{"outbounds":[<one>]}`, and the
-generated config splices whatever shape arrived — `doctor` proves it by running the
-assembled config through `XrayCore.test`. **Rejected:** converting classic → flat
-ourselves (re-implementing the engine's conversion) and rejecting the classic shape (INCY
-exports it).
+The loader accepts both (C5 §1–2): `.xray` exits unwrap `{"outbounds":[…]}` — INCY's
+one-outbound export or a whole client config, where the exit is the single outbound
+that is not the engine's plumbing (`freedom`/`direct`, `blackhole`/`block`, `dns`,
+`loopback`, the loader's table in Xray-core's `infra/conf/xray.go`); two proxies in
+one file is an error that names their tags, never a guess, and only the chosen
+outbound is stored — and the generated config splices whatever shape arrived —
+`doctor` proves it by running the assembled config through `XrayCore.test`.
+**Rejected:** converting classic → flat ourselves (re-implementing the engine's
+conversion) and rejecting the classic shape (INCY exports it).
 
 ## `test` validates; `run` is the only binder
 
@@ -212,7 +216,10 @@ the code a shell expects, after a polite stop of the Go runtime.
 `XrayConfigBuilder` requires a `protocol` string and nothing more: `test` reports an
 unknown protocol with Xray's own message (a plan amendment — A2). An allowlist of
 {vless,vmess,trojan,shadowsocks,socks} would only block legitimate outbounds such as
-wireguard. **Rejected:** the allowlist itself.
+wireguard. The plumbing set that picks the proxy out of a whole client config is the
+inverse of an allowlist — it names the engine's own non-proxy outbounds, so `hysteria`,
+`masque`, `wireguard` or a protocol not yet known stay candidates. **Rejected:** the
+allowlist itself.
 
 ## Config file + environment, with that precedence
 

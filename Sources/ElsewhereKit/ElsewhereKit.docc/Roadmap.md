@@ -45,6 +45,9 @@ Then the `0.1.0` tag by the GitHubWorkflow recipe.
 Two weeks of real use: pagination ergonomics, renderer gaps, `--obey-robots` if ever
 wanted, HEAD/POST if ever needed, exit health in `whoami`, maybe `exits import --incy`.
 
+- **#20**: `exits add --xray` takes a whole client config, keeping its one proxy
+  outbound.
+
 ## M4 · LadaX-macOS plan — *later*
 
 Appendix A of the plan (per-app routing for macOS) promoted to its own megaplan once M2
