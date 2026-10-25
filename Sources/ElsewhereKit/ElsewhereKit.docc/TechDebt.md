@@ -38,7 +38,9 @@ shapes — fully silent, or warning-level to a file.
 **Cost:** no middle volume; `doctor`/`fetch` diagnostics cannot surface engine detail
 without a file. Parse-time deprecation warnings bypass the configured logger entirely
 and reach fd 1 — absorbed by ``OwnStdout`` (the process's own stdout), which is why
-that type exists.
+that type exists. The engine log is the one deliberately unredacted surface: it is
+the engine's own output, which Elsewhere cannot filter (no hook), and it lives 0600
+in a 0700 directory like the config whose secrets it could at worst echo.
 **Discharge:** upstream grows a log hook; until then `.silent` is the default and
 `.file` covers debugging.
 
