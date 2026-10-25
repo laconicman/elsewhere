@@ -80,6 +80,20 @@ for a tool whose output is consumed by agents; `serve` picks the file shape beca
 server's operator has no stdout to read (see "`serve` keeps one engine with every lane,
 lazily").
 
+The engine also writes on stdout *before* any `log` block applies: `infra/conf` prints
+deprecation warnings at parse time through Xray's default handler (observed 2026-10-25
+with a `ws`+`tls` outbound — two `[Warning] common/errors` lines from `test` and from
+`run`). No `loglevel` reaches them, so the process owns its stdout instead
+(``OwnStdout``): once a real command's `run()` begins — `exitingWithStatus` is the one
+helper they all pass through — fd 1 is duplicated for everything Elsewhere prints
+(`emit`, the body, the MCP frames, a `run` child's stdout) and pointed at `/dev/null`,
+or at the engine log once `--xray-log`/the serve default is known, so a parse-time
+warning lands beside the engine's own file log. Claiming in `main()` would be wrong:
+`--help` parses *successfully* into ArgumentParser's HelpCommand and only prints when
+it runs — fd 1 must still be ours then. **Rejected:** swapping fd 1 only around
+engine calls (racy against `serve`'s concurrent writers) and filtering stdout lines
+by shape (the payload is arbitrary text).
+
 ## Flat and classic outbound shapes both accepted
 
 `convertShareLinks` returns this core's **flat** outbound (`settings:{address,port,id,

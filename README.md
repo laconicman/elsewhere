@@ -170,7 +170,9 @@ exit lane plus `direct` — and stops after `--idle-stop MIN` of no calls (defau
 call; `--via-system` unbinds the engine to the system path; `--log-tsv PATH` appends
 an audit row per call and per tunnel lifecycle edge; `--xray-log`/`ELSEWHERE_XRAY_LOG`
 redirect the engine log — serve's default is `~/Library/Logs/elsewhere/xray.log`,
-since stdout is the protocol. Registration recipes for Claude Code, Claude Desktop
+since stdout is the protocol (fd 1 itself is handed to the engine as a sink — its
+parse-time warnings land in the engine log, never in the stream). Registration
+recipes for Claude Code, Claude Desktop
 (`.mcpb`), Devin Desktop and any stdio host: [SETUP.md](SETUP.md).
 
 ## Exit status

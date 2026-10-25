@@ -36,7 +36,9 @@ Xray's console logger writes to **stdout** and the JSON API offers no log callba
 shapes — fully silent, or warning-level to a file.
 
 **Cost:** no middle volume; `doctor`/`fetch` diagnostics cannot surface engine detail
-without a file.
+without a file. Parse-time deprecation warnings bypass the configured logger entirely
+and reach fd 1 — absorbed by ``OwnStdout`` (the process's own stdout), which is why
+that type exists.
 **Discharge:** upstream grows a log hook; until then `.silent` is the default and
 `.file` covers debugging.
 
