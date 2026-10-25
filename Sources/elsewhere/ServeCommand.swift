@@ -41,11 +41,15 @@ struct ServeCommand: AsyncParsableCommand {
     func run() async throws {
         try await reportingErrors { () throws(ElsewhereError) in
             let environment = ProcessInfo.processInfo.environment
+            let log = try engineLog()
+            // A file log is also the better sink: the engine's parse-time lines land
+            // beside its own log instead of in `/dev/null`.
+            if case .file(let path) = log { try OwnStdout.sink(to: path) }
             let serveOptions = ServeOptions(
                 idleStop: idleStop == 0 ? nil : .seconds(Int64(idleStop) * 60),
                 allowPrivate: allowPrivate,
                 viaSystem: tunnel.viaSystem,
-                log: try engineLog(),
+                log: log,
                 tsvLog: logTSV.map { UserPath.url($0) })
             try await withSignalCancellation { () async throws(ElsewhereError) in
                 try await ElsewhereServer.serve(

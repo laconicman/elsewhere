@@ -1,12 +1,14 @@
 public import ElsewhereKit // the façade is the public signature
 import Foundation
 import MCP
+import System
 
 /// The MCP face of `elsewhere`: `elsewhere serve` runs this server over stdio, on
 /// the same Kit the CLI drives. Three tools — `elsewhere_fetch`,
 /// `elsewhere_whoami`, `elsewhere_exits` — and the one lazy tunnel behind them
 /// (Design: "`serve` keeps one engine with every lane, lazily"). stdout is the
-/// protocol: nothing here prints.
+/// protocol: nothing here prints — and fd 1 itself is the engine's sink
+/// (``OwnStdout``); the transport writes to the process's own copy.
 public enum ElsewhereServer {
     /// The `serverInfo.name` the server announces.
     public static let name = "elsewhere"
@@ -49,7 +51,9 @@ public enum ElsewhereServer {
         let server = await makeServer(context: context)
         var failure: (any Error)?
         do {
-            try await server.start(transport: StdioTransport())
+            try await server.start(
+                transport: StdioTransport(
+                    output: FileDescriptor(rawValue: OwnStdout.handle.fileDescriptor)))
             await withTaskCancellationHandler {
                 await server.waitUntilCompleted()
             } onCancel: {

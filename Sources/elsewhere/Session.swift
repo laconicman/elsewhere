@@ -13,9 +13,14 @@ enum Session {
         config: ElsewhereConfig, tunnel: TunnelOptions,
         body: (TunnelSession) async throws(ElsewhereError) -> R
     ) async throws(ElsewhereError) -> R {
+        let log = tunnel.log
+        // `--xray-log`/ELSEWHERE_XRAY_LOG doubles as the sink for the engine's
+        // parse-time lines — the one shared place, so every fetch-like command
+        // gets it (doctor takes no log option; the sink stays `/dev/null`).
+        if case .file(let path) = log { try OwnStdout.sink(to: path) }
         let session = try await TunnelSession.open(
             config: config, exits: names, includeDirect: includeDirect,
-            bindInterface: tunnel.bindInterface(from: config), log: tunnel.log)
+            bindInterface: tunnel.bindInterface(from: config), log: log)
         do {
             let result = try await body(session)
             await session.close()

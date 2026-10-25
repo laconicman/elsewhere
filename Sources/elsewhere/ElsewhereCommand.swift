@@ -45,6 +45,11 @@ struct ElsewhereCommand: AsyncParsableCommand {
             }
         } catch let code as ExitCode {
             Foundation.exit(code.rawValue)
+        } catch let error as ElsewhereError {
+            // An ElsewhereError that escaped its command's own reporter still exits
+            // by the sysexits table, not AP's generic failure.
+            printError(error.localizedDescription)
+            Foundation.exit(error.exitStatus)
         } catch {
             // AP wraps parser outcomes in (internal) CommandError, so the public
             // discriminator is the exit code: .success means help/version/completions
@@ -72,10 +77,11 @@ struct GlobalOptions: ParsableArguments {
     }
 }
 
-/// Writes `line` to stdout at once. `print` is block-buffered when stdout is a pipe or a
+/// Writes `line` to stdout at once — the process's own descriptor after `claim()`,
+/// since fd 1 is the engine's sink. `print` is block-buffered when stdout is a pipe or a
 /// file, so a reader waiting on a line would wait for the process to end.
 func emit(_ line: String) {
-    FileHandle.standardOutput.write(Data((line + "\n").utf8))
+    OwnStdout.handle.write(Data((line + "\n").utf8))
 }
 
 /// Writes `elsewhere: <message>` to stderr, through the pattern scrub — belt and
@@ -99,6 +105,12 @@ func reportingErrors(_ body: () async throws(ElsewhereError) -> Void) async thro
 func exitingWithStatus(_ body: () async throws(ElsewhereError) -> Int32) async throws {
     let code: Int32
     do {
+        // fd 1 is the engine's sink from here on. This helper wraps every
+        // subcommand's run(), so the claim happens once a *real* command starts —
+        // AP's own post-parse writers keep fd 1: `--help` parses into a HelpCommand
+        // whose run() prints through the generic catch below, and `--version` and
+        // `--generate-completion-script` print during parse.
+        try OwnStdout.claim()
         code = try await body()
     } catch {
         printError(error.localizedDescription)
