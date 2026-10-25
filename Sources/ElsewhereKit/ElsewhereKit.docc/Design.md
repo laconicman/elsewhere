@@ -91,9 +91,8 @@ that is not the engine's plumbing (`freedom`/`direct`, `blackhole`/`block`, `dns
 one file is an error that names their tags, never a guess, and only the chosen
 outbound is stored — and the generated config splices whatever shape arrived —
 `doctor` proves it by running the assembled config through `XrayCore.test`.
-**Rejected:** converting classic → flat
-ourselves (re-implementing the engine's conversion) and rejecting the classic shape (INCY
-exports it).
+**Rejected:** converting classic → flat ourselves (re-implementing the engine's
+conversion) and rejecting the classic shape (INCY exports it).
 
 ## `test` validates; `run` is the only binder
 

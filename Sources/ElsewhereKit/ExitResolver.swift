@@ -24,15 +24,15 @@ public enum ExitResolver {
                 // It IS a wrapper, but it does not name one outbound — say which way.
                 let proxies = JSONValue.proxyOutbounds(outbounds)
                 if proxies.isEmpty {
-                    let protocols = outbounds.map { Self.label($0, key: "protocol") }
+                    let protocols = Self.labels(of: outbounds, key: "protocol")
                     throw .exit(
                         "xray exit '\(name)' wraps \(outbounds.count) outbounds, none of them a "
-                            + "proxy (protocols: \(Redactor.scrubPatterns(protocols.joined(separator: ", "))))")
+                            + "proxy (protocols: \(protocols))")
                 }
-                let tags = proxies.map { Self.label($0, key: "tag") }
+                let tags = Self.labels(of: proxies, key: "tag")
                 throw .exit(
-                    "xray exit '\(name)' wraps \(proxies.count) proxy outbounds (tags: "
-                        + "\(Redactor.scrubPatterns(tags.joined(separator: ", ")))) — save the one you mean as its own file")
+                    "xray exit '\(name)' wraps \(proxies.count) proxy outbounds (tags: \(tags)) "
+                        + "— save the one you mean as its own file")
             }
             return unwrapped
         case .link(let link):
@@ -60,10 +60,14 @@ public enum ExitResolver {
         }
     }
 
-    /// `protocol`/`tag` of an outbound for a diagnosis; a missing or non-string value reads `?`.
-    private static func label(_ outbound: JSONValue, key: String) -> String {
-        guard case .object(let object) = outbound, case .string(let value)? = object[key]
-        else { return "?" }
-        return value
+    /// The outbounds' `protocol`s or `tag`s for a diagnosis, comma-joined and pattern-scrubbed
+    /// (a tag is text from a file); a missing or non-string value reads `?`.
+    private static func labels(of outbounds: [JSONValue], key: String) -> String {
+        let values = outbounds.map { outbound -> String in
+            guard case .object(let object) = outbound, case .string(let value)? = object[key]
+            else { return "?" }
+            return value
+        }
+        return Redactor.scrubPatterns(values.joined(separator: ", "))
     }
 }
