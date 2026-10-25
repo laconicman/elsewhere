@@ -32,8 +32,8 @@ public enum ElsewhereServer {
     /// A cancelled wait unblocks the same way: `onCancel` stops the server, the
     /// wait returns, and the tunnel shuts down with reason `signal`.
     /// The server claims the process's stdout itself (idempotent), picks its sink
-    /// per call, and restores fd 1 when it returns — an embedding host keeps its
-    /// stdout; the CLI gets the same guarantee as before.
+    /// per call, and restores fd 1 on every exit after the claim — an embedding host
+    /// keeps its stdout; the CLI gets the same guarantee as before.
     ///
     /// - Throws: `.config` from `--log-tsv`, and `.engine` on a transport
     ///   failure — the "something under us failed" case the Kit already has.
@@ -41,6 +41,10 @@ public enum ElsewhereServer {
         store: ConfigStore, environment: [String: String], options: ServeOptions
     ) async throws(ElsewhereError) {
         try OwnStdout.claim()
+        // Every exit after the claim gives the host its stdout back — a bad `--log-tsv`
+        // or an unwritable sink included. `restore` is dup2 of a live descriptor; the one
+        // way it fails is a dead fd, which no later write could use either.
+        defer { try? OwnStdout.restore() }
         // Every serve picks its sink: `.silent` resets to /dev/null, so a host that served
         // with a file log earlier does not keep feeding it.
         let sinkPath = if case .file(let path) = options.log { path } else { "/dev/null" }
@@ -74,8 +78,6 @@ public enum ElsewhereServer {
         }
         await context.tunnel.shutdown(reason: Task.isCancelled ? "signal" : "eof")
         await server.stop()
-        // Nothing of ours can write on fd 1 any more — give the host its stdout back.
-        try OwnStdout.restore()
         if let failure, !(failure is CancellationError) {
             throw .engine(
                 "mcp transport: \(Redactor.scrubPatterns(failure.localizedDescription))")
