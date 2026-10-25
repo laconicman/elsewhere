@@ -6,7 +6,8 @@ import XrayCore // internal — the engine stays behind this module's own types 
 /// `proxy` exit yields `nil` — URLSession talks to it directly, Xray is not involved.
 public enum ExitResolver {
     /// - Throws: `ElsewhereError.engine` (the engine's message, scrubbed of the link's
-    ///   secrets) or `.exit` when a link resolves to a wrong number of outbounds.
+    ///   secrets) or `.exit` when a link or wrapper resolves to a wrong number of
+    ///   outbounds.
     public static func outbound(for exit: Exit, named name: String) async throws(ElsewhereError)
         -> JSONValue?
     {
@@ -15,13 +16,23 @@ public enum ExitResolver {
             return nil
         case .xray(let value):
             // C5 §1–2: the loader accepts the flat shape and the classic `vnext`/`servers`
-            // one, so pasted JSON (INCY's export carries `{"outbounds":[<one>]}`) works —
-            // unwrap exactly one outbound, pass everything else through to `test`.
+            // one, so pasted JSON works — INCY's `{"outbounds":[<one>]}` export or a whole
+            // client config, whose one proxy is kept and whose plumbing (`direct`, `block`,
+            // `dns-out`) is dropped. Everything else passes through to `test`.
             let unwrapped = value.singleOutbound
             if unwrapped == value, case .array(let outbounds) = value["outbounds"] {
-                // It IS a wrapper, but not exactly one object — not an outbound.
+                // It IS a wrapper, but it does not name one outbound — say which way.
+                let proxies = JSONValue.proxyOutbounds(outbounds)
+                if proxies.isEmpty {
+                    let protocols = outbounds.map { Self.label($0, key: "protocol") }
+                    throw .exit(
+                        "xray exit '\(name)' wraps \(outbounds.count) outbounds, none of them a "
+                            + "proxy (protocols: \(Redactor.scrubPatterns(protocols.joined(separator: ", "))))")
+                }
+                let tags = proxies.map { Self.label($0, key: "tag") }
                 throw .exit(
-                    "xray exit '\(name)' wraps \(outbounds.count) outbounds, expected 1")
+                    "xray exit '\(name)' wraps \(proxies.count) proxy outbounds (tags: "
+                        + "\(Redactor.scrubPatterns(tags.joined(separator: ", ")))) — save the one you mean as its own file")
             }
             return unwrapped
         case .link(let link):
@@ -47,5 +58,12 @@ public enum ExitResolver {
             }
             return envelope.outbounds[0]
         }
+    }
+
+    /// `protocol`/`tag` of an outbound for a diagnosis; a missing or non-string value reads `?`.
+    private static func label(_ outbound: JSONValue, key: String) -> String {
+        guard case .object(let object) = outbound, case .string(let value)? = object[key]
+        else { return "?" }
+        return value
     }
 }

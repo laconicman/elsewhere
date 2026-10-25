@@ -52,16 +52,35 @@ extension JSONValue: Codable {
 }
 
 extension JSONValue {
-    /// A stored `xray` value may be the bare outbound or INCY's `{"outbounds":[<one>]}`
-    /// export wrapper — the one place that unwraps, so `ExitResolver`, `summary` and
-    /// `describe` agree (a hand-edited wrapper still lists correctly). Anything that is
-    /// not exactly one wrapped object comes back unchanged; `ExitResolver` turns that
-    /// case into `.exit`.
+    /// Xray-core's outbounds that dial no server — the engine's own plumbing, with the
+    /// loader's aliases (`infra/conf/xray.go`): `freedom`/`direct`, `blackhole`/`block`,
+    /// `dns`, `loopback`. A whole client config lists them beside the proxy; none is ever
+    /// the exit. The inverse of an allowlist: any other protocol stays the engine's to judge.
+    static let plumbingProtocols: Set<String> = [
+        "freedom", "direct", "blackhole", "block", "dns", "loopback",
+    ]
+
+    /// The outbounds of a wrapper that could be the exit — objects whose `protocol` is a
+    /// string outside ``plumbingProtocols``.
+    static func proxyOutbounds(_ outbounds: [JSONValue]) -> [JSONValue] {
+        outbounds.filter {
+            guard case .object(let object) = $0, case .string(let proto)? = object["protocol"]
+            else { return false }
+            return !plumbingProtocols.contains(proto)
+        }
+    }
+
+    /// A stored `xray` value may be the bare outbound, INCY's `{"outbounds":[<one>]}`
+    /// export wrapper, or a whole client config — the one place that unwraps, so
+    /// `ExitResolver`, `summary` and `describe` agree (a hand-edited wrapper still lists
+    /// correctly). One wrapped object is taken as is; among several, the single
+    /// non-plumbing one is the exit. Anything else comes back unchanged; `ExitResolver`
+    /// turns that case into `.exit`.
     var singleOutbound: JSONValue {
-        guard case .array(let outbounds) = self["outbounds"], outbounds.count == 1,
-            case .object = outbounds[0]
-        else { return self }
-        return outbounds[0]
+        guard case .array(let outbounds) = self["outbounds"] else { return self }
+        if outbounds.count == 1, case .object = outbounds[0] { return outbounds[0] }
+        let proxies = Self.proxyOutbounds(outbounds)
+        return proxies.count == 1 ? proxies[0] : self
     }
 }
 
