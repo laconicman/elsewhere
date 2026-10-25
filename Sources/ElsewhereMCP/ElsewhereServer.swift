@@ -31,12 +31,16 @@ public enum ElsewhereServer {
     /// teardown lives after it — `shutdown(reason:)` the tunnel, then `stop()`.
     /// A cancelled wait unblocks the same way: `onCancel` stops the server, the
     /// wait returns, and the tunnel shuts down with reason `signal`.
+    /// The server claims the process's stdout itself (idempotent), so an
+    /// embedding host gets the same guarantee as the CLI.
     ///
     /// - Throws: `.config` from `--log-tsv`, and `.engine` on a transport
     ///   failure — the "something under us failed" case the Kit already has.
     public static func serve(
         store: ConfigStore, environment: [String: String], options: ServeOptions
     ) async throws(ElsewhereError) {
+        try OwnStdout.claim()
+        if case .file(let path) = options.log { try OwnStdout.sink(to: path) }
         // `Optional.map` would rethrow as `any Error` — the typed throw is spelt out.
         let tsv: TSVLog? = if let tsvPath = options.tsvLog {
             try TSVLog(path: tsvPath)

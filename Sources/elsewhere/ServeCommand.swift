@@ -42,9 +42,6 @@ struct ServeCommand: AsyncParsableCommand {
         try await reportingErrors { () throws(ElsewhereError) in
             let environment = ProcessInfo.processInfo.environment
             let log = try engineLog()
-            // A file log is also the better sink: the engine's parse-time lines land
-            // beside its own log instead of in `/dev/null`.
-            if case .file(let path) = log { try OwnStdout.sink(to: path) }
             let serveOptions = ServeOptions(
                 idleStop: idleStop == 0 ? nil : .seconds(Int64(idleStop) * 60),
                 allowPrivate: allowPrivate,
