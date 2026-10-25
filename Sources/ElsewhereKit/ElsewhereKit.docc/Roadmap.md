@@ -47,6 +47,9 @@ wanted, HEAD/POST if ever needed, exit health in `whoami`, maybe `exits import -
 
 - **#20**: `exits add --xray` takes a whole client config, keeping its one proxy
   outbound.
+- **#22** ([#21](https://github.com/laconicman/elsewhere/issues/21)): the process owns
+  its stdout — engine parse-time warnings go to the sink, never into `fetch`'s
+  payload or `serve`'s frames.
 
 ## M4 · LadaX-macOS plan — *later*
 

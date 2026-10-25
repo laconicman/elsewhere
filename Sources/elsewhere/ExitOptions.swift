@@ -35,7 +35,7 @@ struct TunnelOptions: ParsableArguments {
 
     @Option(
         name: .customLong("xray-log"),
-        help: "Write the engine's warnings to this file; env ELSEWHERE_XRAY_LOG; default silent. A leading ~ is expanded.")
+        help: "Write the engine's warnings to this file; env ELSEWHERE_XRAY_LOG; default silent. A leading ~ is expanded. Must be writable — checked before the route runs.")
     var xrayLog: String?
 
     /// Flag beats env, env beats silent. Both are JSON/shell text — `UserPath`

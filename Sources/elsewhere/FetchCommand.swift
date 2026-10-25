@@ -186,9 +186,9 @@ struct FetchCommand: AsyncParsableCommand {
             switch selection {
             case .bytes(let data):
                 // raw — the wire bytes, untouched.
-                FileHandle.standardOutput.write(data)
+                OwnStdout.handle.write(data)
             case .text(let body):
-                FileHandle.standardOutput.write(Data(body.utf8))
+                OwnStdout.handle.write(Data(body.utf8))
             case .undecodable:
                 printError(
                     "\(result.contentType ?? "unknown type"), \(result.body.count) bytes — "

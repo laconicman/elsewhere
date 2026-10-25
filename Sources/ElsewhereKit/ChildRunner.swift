@@ -87,7 +87,9 @@ public enum ChildRunner {
                 process.arguments = command
                 process.environment = environment(
                     for: route, base: ProcessInfo.processInfo.environment)
-                // Stdio inherited — the child's output is the point.
+                // stdout is the process's own channel — fd 1 is the engine's sink
+                // (`OwnStdout`); stdin/stderr stay inherited.
+                process.standardOutput = OwnStdout.handle
                 process.terminationHandler = { finished in
                     continuation.resume(
                         returning: .success(

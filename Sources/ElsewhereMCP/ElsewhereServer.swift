@@ -1,12 +1,14 @@
 public import ElsewhereKit // the façade is the public signature
 import Foundation
 import MCP
+import System
 
 /// The MCP face of `elsewhere`: `elsewhere serve` runs this server over stdio, on
 /// the same Kit the CLI drives. Three tools — `elsewhere_fetch`,
 /// `elsewhere_whoami`, `elsewhere_exits` — and the one lazy tunnel behind them
 /// (Design: "`serve` keeps one engine with every lane, lazily"). stdout is the
-/// protocol: nothing here prints.
+/// protocol: nothing here prints — and fd 1 itself is the engine's sink
+/// (``OwnStdout``); the transport writes to the process's own copy.
 public enum ElsewhereServer {
     /// The `serverInfo.name` the server announces.
     public static let name = "elsewhere"
@@ -29,12 +31,24 @@ public enum ElsewhereServer {
     /// teardown lives after it — `shutdown(reason:)` the tunnel, then `stop()`.
     /// A cancelled wait unblocks the same way: `onCancel` stops the server, the
     /// wait returns, and the tunnel shuts down with reason `signal`.
+    /// The server claims the process's stdout itself (idempotent), picks its sink
+    /// per call, and restores fd 1 on every exit after the claim — an embedding host
+    /// keeps its stdout; the CLI gets the same guarantee as before.
     ///
     /// - Throws: `.config` from `--log-tsv`, and `.engine` on a transport
     ///   failure — the "something under us failed" case the Kit already has.
     public static func serve(
         store: ConfigStore, environment: [String: String], options: ServeOptions
     ) async throws(ElsewhereError) {
+        try OwnStdout.claim()
+        // Every exit after the claim gives the host its stdout back — a bad `--log-tsv`
+        // or an unwritable sink included. `restore` is dup2 of a live descriptor; the one
+        // way it fails is a dead fd, which no later write could use either.
+        defer { try? OwnStdout.restore() }
+        // Every serve picks its sink: `.silent` resets to /dev/null, so a host that served
+        // with a file log earlier does not keep feeding it.
+        let sinkPath = if case .file(let path) = options.log { path } else { "/dev/null" }
+        try OwnStdout.sink(to: sinkPath)
         // `Optional.map` would rethrow as `any Error` — the typed throw is spelt out.
         let tsv: TSVLog? = if let tsvPath = options.tsvLog {
             try TSVLog(path: tsvPath)
@@ -49,7 +63,9 @@ public enum ElsewhereServer {
         let server = await makeServer(context: context)
         var failure: (any Error)?
         do {
-            try await server.start(transport: StdioTransport())
+            try await server.start(
+                transport: StdioTransport(
+                    output: FileDescriptor(rawValue: OwnStdout.handle.fileDescriptor)))
             await withTaskCancellationHandler {
                 await server.waitUntilCompleted()
             } onCancel: {

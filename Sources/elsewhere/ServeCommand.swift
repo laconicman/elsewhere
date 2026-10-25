@@ -41,11 +41,12 @@ struct ServeCommand: AsyncParsableCommand {
     func run() async throws {
         try await reportingErrors { () throws(ElsewhereError) in
             let environment = ProcessInfo.processInfo.environment
+            let log = try engineLog()
             let serveOptions = ServeOptions(
                 idleStop: idleStop == 0 ? nil : .seconds(Int64(idleStop) * 60),
                 allowPrivate: allowPrivate,
                 viaSystem: tunnel.viaSystem,
-                log: try engineLog(),
+                log: log,
                 tsvLog: logTSV.map { UserPath.url($0) })
             try await withSignalCancellation { () async throws(ElsewhereError) in
                 try await ElsewhereServer.serve(
