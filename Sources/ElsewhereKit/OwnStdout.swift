@@ -40,6 +40,17 @@ public enum OwnStdout {
     /// be opened is an error up front, for every route: the caller asked for that file.
     public static func sink(to path: String) throws(ElsewhereError) { try redirect(to: path) }
 
+    /// Puts the original stdout back on fd 1 — for a host that embeds ``ElsewhereServer``
+    /// and prints after `serve` returns. ``handle`` stays valid (same open file), and the
+    /// claim stays recorded, so a later `serve` only needs to pick its sink again. The CLI
+    /// never needs this: its process ends with the command.
+    public static func restore() throws(ElsewhereError) {
+        guard let handle = claimed.withLock({ $0 }) else { return }
+        guard dup2(handle.fileDescriptor, STDOUT_FILENO) >= 0 else {
+            throw .config("cannot restore stdout: \(errnoText())")
+        }
+    }
+
     private static func redirect(to path: String) throws(ElsewhereError) {
         let fd = open(path, O_WRONLY | O_APPEND | O_CREAT, 0o600)
         guard fd >= 0 else { throw .config("cannot open \(path) as the engine's stdout: \(errnoText())") }

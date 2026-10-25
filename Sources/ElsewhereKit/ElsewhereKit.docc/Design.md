@@ -89,8 +89,8 @@ helper they all pass through — fd 1 is duplicated for everything Elsewhere pri
 (`emit`, the body, the MCP frames, a `run` child's stdout) and pointed at `/dev/null`,
 or at the engine log once `--xray-log`/the serve default is known, so a parse-time
 warning lands beside the engine's own file log (`ElsewhereServer.serve` claims it as
-well, idempotently — the guarantee does not depend on the CLI wrapper). Claiming in
-`main()` would be wrong:
+well, idempotently — the guarantee does not depend on the CLI wrapper — and restores
+fd 1 when it returns). Claiming in `main()` would be wrong:
 `--help` parses *successfully* into ArgumentParser's HelpCommand and only prints when
 it runs — fd 1 must still be ours then. **Rejected:** swapping fd 1 only around
 engine calls (racy against `serve`'s concurrent writers) and filtering stdout lines
