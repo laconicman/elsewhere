@@ -324,10 +324,11 @@ it: Claude Desktop substitutes `${HOME}` in `mcp_config` but not inside a `user_
 default (mcpb#251), and its install form has no empty state for an optional field — so
 the bundle launches the SETUP path and offers one required knob, the idle minutes
 (TD-8). The `elsewhere` skill ("try Elsewhere first") gives an agent the route the
-inaccessible-sources rule lacks: a step 0 before inferring or asking. **Rejected:** bundling the binary in the `.mcpb` (deepwiki-mcp's precedent and
-reasoning); a Homebrew formula (a tap for an audience of one); `ELSEWHERE_LINK` in a host
-config — the secret would sit in plain text beside other servers' settings, where
-`exits add --link -` keeps it in the 0600 file.
+inaccessible-sources rule lacks: a step 0 before inferring or asking. **Rejected:** bundling
+the binary in the `.mcpb` (deepwiki-mcp's precedent and reasoning); a Homebrew formula (a
+tap for an audience of one); `ELSEWHERE_LINK` in a host config — the secret would sit in
+plain text beside other servers' settings, where `exits add --link -` keeps it in the 0600
+file.
 
 ## See Also
 
