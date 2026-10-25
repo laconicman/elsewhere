@@ -21,9 +21,10 @@ public enum OwnStdout {
         claimed.withLock { $0 } ?? .standardOutput
     }
 
-    /// Duplicates fd 1 into ``handle`` and points fd 1 at `/dev/null`. Call once, after
-    /// argument parsing (ArgumentParser prints help on fd 1 during parse) and before any
-    /// engine or output call. A second call is a no-op.
+    /// Duplicates fd 1 into ``handle`` and points fd 1 at `/dev/null`. Call once, when a
+    /// real command starts running and before any engine or output call — not at parse:
+    /// ArgumentParser's `--help` parses into a command whose `run()` prints on fd 1. A
+    /// second call is a no-op.
     public static func claim() throws(ElsewhereError) {
         try claimed.withLock { (slot) throws(ElsewhereError) in
             guard slot == nil else { return }
