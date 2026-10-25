@@ -30,9 +30,12 @@ git-ignored.)
 
 1. Claude Desktop → **Settings → Extensions** → drag `elsewhere.mcpb` in (or
    **Install Extension…**).
-2. When prompted, set **elsewhere binary** to your executable's path (default
-   `~/.local/bin/elsewhere`); optionally set the idle minutes and the engine log
-   file.
+2. When prompted, set the idle minutes (default 10; `0` = never). The bundle
+   launches `~/.local/bin/elsewhere` — the path SETUP.md prescribes — because
+   Claude Desktop does not expand `${HOME}` inside a user-configurable default
+   ([mcpb#251](https://github.com/modelcontextprotocol/mcpb/issues/251)); for
+   another location, edit `manifest.json` and re-pack (TD-8). The engine logs to
+   `~/Library/Logs/elsewhere/xray.log`.
 3. Verify: the tools icon lists `elsewhere_fetch`, `elsewhere_whoami`,
    `elsewhere_exits`, or ask Desktop *"what elsewhere tools do you have?"*. Logs:
    `~/Library/Logs/Claude/mcp-server-elsewhere.log`.

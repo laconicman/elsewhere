@@ -84,6 +84,22 @@ live engine lane completes in ~0.6 s (~9 MB/s) — fine for 0.1.0.
 **Discharge:** rewrite the read path as a `URLSessionDataDelegate` accumulating
 `Data` chunks if the measurement ever says it matters — it does not yet.
 
+### TD-8 — the `.mcpb` binary path is fixed to `~/.local/bin/elsewhere` — *open*, [#18](https://github.com/laconicman/elsewhere/issues/18)
+
+The Desktop bundle launches `${HOME}/.local/bin/elsewhere` directly rather than offering the
+path as a `user_config` option: Claude Desktop substitutes `${HOME}` in `mcp_config` but not
+inside a `user_config` default ([mcpb#251](https://github.com/modelcontextprotocol/mcpb/issues/251)),
+and its install form would not accept an empty optional field (observed 2026-10-24) — so the
+bundle offers one required knob, the idle minutes, and the engine log stays at `serve`'s default.
+The mechanism, read in Desktop's launcher: `mcp_config` is substituted in one ordered pass —
+`HOME` before `user_config.*` — so a `${HOME}` that arrives through a user value is never
+expanded, and the executable check runs on the resolved `command`, not `entry_point`.
+
+**Cost:** a Desktop user whose binary lives elsewhere edits the manifest and re-packs instead
+of typing a path at install time.
+**Discharge:** mcpb#251 fixed upstream → restore the `binary_path` option with that default and
+point `command`/`entry_point` back at `${user_config.binary_path}`.
+
 ## See Also
 
 - <doc:Design>
