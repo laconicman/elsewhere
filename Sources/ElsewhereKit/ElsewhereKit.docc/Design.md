@@ -53,17 +53,36 @@ through it (S3 proved it on the live tunnel — bound egress differed). `auto` r
 current path's first physical interface at tunnel start via `NWPathMonitor`; if none is
 found that is a `doctor` failure and a tunnel-time error, never a quiet unbind (A8 —
 rule 5).
-**The caveat (C5 §6):** the *connection* is bound; the *hostname lookup* is not — Xray's
-freedom outbound resolves through the system resolver. Direct connection, system-path
-lookup; accepted for 0.1.0 (TD-4). **Rejected:** per-exit binding (unneeded flexibility)
-and `sendThrough` (link-converted outbounds can carry it; it means something else and is
+The *hostname lookup* is bound too (TD-4 discharged): a bound `direct` resolves
+through the engine's `dns` module — DoH servers named by IP literal (`directDNS` in
+the config, ``DirectDNS/defaults`` otherwise) — over `out:direct` itself, with
+`ForceIPv4v6` on the sockopt so a failed lookup is a failed fetch, never a
+fall-through to the system resolver (rule 5). **Rejected:** per-exit binding (unneeded flexibility) and
+`sendThrough` (link-converted outbounds can carry it; it means something else and is
 stripped).
 
-## No `dns` block
+## A `dns` block for `direct` only
 
-Routing uses `domainStrategy: AsIs`: hostnames travel to the exit and resolve there — the
-exit country resolves the name, which is the point. **Rejected:** a `dns` block would
-re-decide what the plan deliberately delegates.
+Routing stays `domainStrategy: AsIs`: hostnames travel to the exit and resolve there —
+the exit country resolves the name, which is the point — and exits never touch the
+`dns` block. It exists because a *bound* `direct` must resolve *itself* without the
+system resolver, which a tunnel can own (fake-IP answers: `198.18.0.0/15`,
+`240.0.0.0/4` — `doctor`'s `resolver` check warns) — and it exists only for that
+lane: a bound lane gets its own resolver, while an unbound one (`--via-system`) is
+simply the system path, name lookup included — fake-IP answers are routable there
+and a corporate split-horizon resolver keeps working. `dns.servers` are DoH URLs given by **IP
+literal** so they need no bootstrap lookup (`app/dns/nameserver_doh.go` L133–148 at
+v26.10.21); the dns module's `https://` queries are ordinary outbound sessions that
+the `inboundTag: ["dns"]` rule steers onto `out:direct` — unmatched, they would ride
+the FIRST outbound, an exit (`app/dns/dns.go` L89–145, `app/dispatcher/default.go`
+L433–464). `ForceIPv4v6` — not `UseIP*` — because `UseIP*` falls through to dialing
+by domain via the system resolver on a lookup failure (`transport/internet/dialer.go`
+L250–281, `freedom.go` L295–302). **Rejected:** resolving in Swift (URLSession has no
+`--resolve`; TLS runs on the hostname end-to-end, so the IP has nowhere to go but back
+into Xray), `https+local://` DoH URLs (they bypass routing onto the system dialer —
+`app/dns/nameserver.go` L53–63), hostname-based DoH URLs (their bootstrap lookup needs
+the very resolver `direct` avoids), and a system-resolver entry such as `localhost`
+(Xray would add a system-resolver client — `dns.go` L253–296).
 
 ## The engine's log is never a console log
 

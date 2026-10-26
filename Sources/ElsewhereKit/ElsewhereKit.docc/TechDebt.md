@@ -47,16 +47,22 @@ directory).
 **Discharge:** upstream grows a log hook; until then `.silent` is the default and
 `.file` covers debugging.
 
-### TD-4 — direct-path DNS is not bound to the interface — *open*, [#5](https://github.com/laconicman/elsewhere/issues/5)
+### TD-4 — direct-path DNS is not bound to the interface — *discharged*, [#5](https://github.com/laconicman/elsewhere/issues/5)
 
-`sockopt.interface` binds the *connection*; the freedom outbound resolves the CONNECT
+`sockopt.interface` binds the *connection*; the freedom outbound resolved the CONNECT
 hostname through the unbound system resolver (C5 §6). With a system VPN up, a `--direct`
-connection is direct but its lookup follows the system path.
+connection was direct but its lookup followed the system path — and a fake-IP resolver
+answered with addresses only the tunnel could route.
 
-**Cost:** the tunnel sees the hostname, not the traffic; a lookup that fails inside the
-tunnel fails `--direct` too.
-**Discharge:** an Xray `dns` block or an interface-bound resolver — only if it ever
-matters in practice (recorded, not scheduled).
+**Cost:** the tunnel saw the hostname, not the traffic; a lookup that fails inside the
+tunnel failed `--direct` too.
+**Discharge:** discharged by `DirectDNS` + the builder's `dns` block — a bound
+`direct` resolves through the engine's dns module over DoH servers given by IP
+literal, steered onto `out:direct` by the `inboundTag: ["dns"]` rule under
+`ForceIPv4v6`, so a failed lookup is a failed fetch — in `ead55a4` (`FEAT: the
+direct lane resolves names itself over DoH`); an unbound lane (`--via-system`)
+stays the system path, lookup included. `doctor`'s `resolver` check warns when
+the system resolver is tunnel-owned.
 
 ### TD-5 — XrayCore lifecycle edges are unpinned — *open*, [#6](https://github.com/laconicman/elsewhere/issues/6)
 
@@ -106,6 +112,19 @@ expanded, and the executable check runs on the resolved `command`, not `entry_po
 of typing a path at install time.
 **Discharge:** mcpb#251 fixed upstream → restore the `binary_path` option with that default and
 point `command`/`entry_point` back at `${user_config.binary_path}`.
+
+### TD-9 — `--resolve HOST:IP` is possible via `dns.hosts` but undecided — *open* (no issue yet)
+
+`dns.hosts` is a static host→IP map consulted before any server
+(`infra/conf/dns.go` L211–239, `app/dns/dns.go` L308–354 at v26.10.21), so a
+`fetch --resolve HOST:IP` flag is a small addition on top of the `direct` lane's
+DNS machinery.
+
+**Cost:** a page pinned to an address — a stale record, an alternate IP the
+resolver will not give — cannot be expressed at all.
+**Discharge:** `fetch` builds one tunnel per call, so the flag is trivial there;
+`serve` builds its config once per tunnel and would need a restart or a refusal —
+decide whether a tool argument is worth that asymmetry. Recorded, not scheduled.
 
 ## See Also
 
