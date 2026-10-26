@@ -34,6 +34,11 @@ struct XrayConfigBuilderTests {
                 """.utf8))
     }
 
+    static func parsed(_ configJSON: String) throws -> [String: Any] {
+        try #require(
+            JSONSerialization.jsonObject(with: Data(configJSON.utf8)) as? [String: Any])
+    }
+
     static func fixture(_ name: String) throws -> String {
         let url = try #require(
             Bundle.module.url(forResource: name, withExtension: "json", subdirectory: "Fixtures"))
@@ -175,6 +180,133 @@ struct XrayConfigBuilderTests {
         #expect(stream["network"] as? String == "xhttp")
         #expect(sockopt["tcpFastOpen"] as? Bool == true)
         #expect(sockopt["interface"] as? String == "en0")
+    }
+
+    // MARK: - The direct lane's DNS (TD-4)
+
+    /// The `dns` block, the `inboundTag:["dns"] → out:direct` steering rule and
+    /// `ForceIPv4v6` on `out:direct`'s sockopt — the whole bound-lane contract.
+    @Test func aBoundDirectGetsDNSForceStrategyAndTheSteeringRule() throws {
+        let (configJSON, _) = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152], directPort: 49154, bindInterface: "en0",
+            directDNS: ["https://9.9.9.9/dns-query", "https://[2620:fe::fe]/dns-query"])
+        let root = try Self.parsed(configJSON)
+        let dns = try #require(root["dns"] as? [String: Any])
+        #expect(
+            dns["servers"] as? [String]
+                == ["https://9.9.9.9/dns-query", "https://[2620:fe::fe]/dns-query"])
+        #expect(dns["tag"] as? String == "dns")
+        let rules = try #require(
+            (root["routing"] as? [String: Any])?["rules"] as? [[String: Any]])
+        #expect(rules.contains {
+            $0["inboundTag"] as? [String] == ["dns"]
+                && $0["outboundTag"] as? String == "out:direct"
+        })
+        let outbounds = try #require(root["outbounds"] as? [[String: Any]])
+        let direct = try #require(
+            outbounds.first { $0["tag"] as? String == "out:direct" })
+        let sockopt = try #require(
+            (direct["streamSettings"] as? [String: Any])?["sockopt"] as? [String: Any])
+        #expect(sockopt["domainStrategy"] as? String == "ForceIPv4v6")
+        #expect(sockopt["interface"] as? String == "en0")
+    }
+
+    /// `--via-system`: direct is simply the system path, name lookup included —
+    /// no `dns` block, no `dns` rule, no sockopt at all on the freedom outbound.
+    @Test func anUnboundDirectIsTheSystemPathLookupIncluded() throws {
+        let (configJSON, _) = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152], directPort: 49154, bindInterface: nil,
+            directDNS: ["https://9.9.9.9/dns-query"])
+        let root = try Self.parsed(configJSON)
+        #expect(root["dns"] == nil)
+        let rules = try #require(
+            (root["routing"] as? [String: Any])?["rules"] as? [[String: Any]])
+        #expect(
+            rules.allSatisfy {
+                ($0["inboundTag"] as? [String])?.contains("dns") != true
+            })
+        let outbounds = try #require(root["outbounds"] as? [[String: Any]])
+        let direct = try #require(
+            outbounds.first { $0["tag"] as? String == "out:direct" })
+        #expect(direct["protocol"] as? String == "freedom")
+        #expect(direct["streamSettings"] == nil)
+    }
+
+    /// An unbound lane never reads `directDNS` — not even to reject it.
+    @Test func anUnboundDirectSkipsDirectDNSValidation() throws {
+        _ = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152], directPort: 49154, bindInterface: nil,
+            directDNS: ["not a url"])
+    }
+
+    /// Exits stay `AsIs` — the `dns` block exists for `direct` only.
+    @Test func exitOutboundsCarryNoDomainStrategy() throws {
+        let (configJSON, _) = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152], directPort: 49154, bindInterface: "en0",
+            directDNS: ["https://9.9.9.9/dns-query"])
+        let root = try Self.parsed(configJSON)
+        let outbounds = try #require(root["outbounds"] as? [[String: Any]])
+        let exit = try #require(
+            outbounds.first { $0["tag"] as? String == "out:moldova" })
+        let sockopt = try #require(
+            (exit["streamSettings"] as? [String: Any])?["sockopt"] as? [String: Any])
+        #expect(sockopt["interface"] as? String == "en0")
+        #expect(sockopt["domainStrategy"] == nil)
+    }
+
+    /// No direct lane → no `dns` key and no dns rule, servers given or not.
+    @Test func noDirectLaneMeansNoDNSBlock() throws {
+        let (configJSON, _) = try XrayConfigBuilder.build(
+            exits: [("moldova", Self.spikeOutbound())],
+            ports: ["moldova": 49152], directPort: nil, bindInterface: "en0",
+            directDNS: ["https://9.9.9.9/dns-query"])
+        let root = try Self.parsed(configJSON)
+        #expect(root["dns"] == nil)
+        let rules = try #require(
+            (root["routing"] as? [String: Any])?["rules"] as? [[String: Any]])
+        #expect(
+            rules.allSatisfy {
+                ($0["inboundTag"] as? [String])?.contains("dns") != true
+            })
+    }
+
+    /// A hostname would bootstrap through the system resolver; a non-https
+    /// scheme would bypass routing (DOHL); no path is no endpoint.
+    @Test(arguments: [
+        "http://1.1.1.1/dns-query",
+        "https+local://1.1.1.1/dns-query",
+        "https://dns.google/dns-query",
+        "https://one.one.one.one/dns-query",
+        "https://1.1.1.1",
+        "https://[cloudflare-dns.com]/dns-query",
+        "not a url",
+        "",
+    ])
+    func anInvalidDirectDNSEntryIsAConfigError(entry: String) {
+        do {
+            _ = try XrayConfigBuilder.build(
+                exits: [("moldova", Self.spikeOutbound())],
+                ports: ["moldova": 49152], directPort: 49154, bindInterface: "en0",
+                directDNS: [entry])
+            Issue.record("expected .config for '\(entry)'")
+        } catch ElsewhereError.config(let message) {
+            #expect(message.contains("https://<ip>/path"))
+        } catch { Issue.record("expected .config, got \(error)") }
+    }
+
+    @Test func anEmptyDirectDNSListIsAConfigError() {
+        do {
+            _ = try XrayConfigBuilder.build(
+                exits: [("moldova", Self.spikeOutbound())],
+                ports: ["moldova": 49152], directPort: 49154, bindInterface: "en0",
+                directDNS: [])
+            Issue.record("expected .config")
+        } catch ElsewhereError.config {
+        } catch { Issue.record("expected .config, got \(error)") }
     }
 
     @Test func lanesCarryPortsAndTags() throws {

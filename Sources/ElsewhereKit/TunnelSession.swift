@@ -72,7 +72,8 @@ public actor TunnelSession {
                     if let outbound = try await ExitResolver.outbound(for: exit, named: name) {
                         try await ExitValidator.assertBuildable(
                             outbound, named: name,
-                            secrets: Redactor.secrets(inLink: link) + [link])
+                            secrets: Redactor.secrets(inLink: link) + [link],
+                            directDNS: config.directDNSServers)
                         xrayExits.append((name, outbound))
                     }
                 } catch { failures[name] = error }
@@ -80,7 +81,8 @@ public actor TunnelSession {
                 do {
                     if let outbound = try await ExitResolver.outbound(for: exit, named: name) {
                         try await ExitValidator.assertBuildable(
-                            outbound, named: name, secrets: [])
+                            outbound, named: name, secrets: [],
+                            directDNS: config.directDNSServers)
                         xrayExits.append((name, outbound))
                     }
                 } catch { failures[name] = error }
@@ -100,7 +102,8 @@ public actor TunnelSession {
             let lanes = try await supervisor.start(
                 exits: xrayExits, includeDirect: includeDirect,
                 bindInterface: interface, log: log,
-                excludingPorts: excludedPorts)
+                excludingPorts: excludedPorts,
+                directDNS: config.directDNSServers)
             startedEngine = true
             for lane in lanes {
                 routes[lane.exitName] = .inbound(exit: lane.exitName, port: lane.inboundPort)

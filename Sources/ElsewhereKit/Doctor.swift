@@ -242,7 +242,9 @@ public enum Doctor {
             do {
                 let built = try XrayConfigBuilder.build(
                     exits: resolved, ports: portsByName,
-                    directPort: ports[resolved.count], bindInterface: interface, log: .silent)
+                    directPort: ports[resolved.count], bindInterface: interface,
+                    directDNS: config?.directDNSServers ?? DirectDNS.defaults,
+                    log: .silent)
                 try await XrayCore.shared.test(configJSON: built.configJSON)
                 checks.append(Check(
                     name: "xray config", verdict: .ok,

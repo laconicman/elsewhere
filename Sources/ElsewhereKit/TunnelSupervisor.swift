@@ -69,7 +69,8 @@ public actor TunnelSupervisor {
         includeDirect: Bool,
         bindInterface: String?,
         log: XrayConfigBuilder.XrayLog,
-        excludingPorts: [UInt16]
+        excludingPorts: [UInt16],
+        directDNS: [String] = DirectDNS.defaults
     ) async throws(ElsewhereError) -> [XrayConfigBuilder.Lane] {
         guard !isUp, !starting else { throw .tunnel("tunnel already running") }
         starting = true
@@ -128,7 +129,7 @@ public actor TunnelSupervisor {
             let built = try XrayConfigBuilder.build(
                 exits: exits, ports: portsByName,
                 directPort: includeDirect ? ports[exits.count] : nil,
-                bindInterface: bindInterface, log: log)
+                bindInterface: bindInterface, directDNS: directDNS, log: log)
             do {
                 try await XrayCore.shared.test(configJSON: built.configJSON)
             } catch {

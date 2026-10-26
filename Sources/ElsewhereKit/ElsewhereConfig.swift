@@ -12,6 +12,9 @@ public struct ElsewhereConfig: Codable, Sendable, Equatable {
     public var bindInterface: BindInterface
     /// The `User-Agent` a fetch sends (D8 — a browser's UA is the owner's decision).
     public var userAgent: UserAgent
+    /// DoH servers the `direct` lane resolves through (``DirectDNS``); unset means
+    /// the defaults. Validated at tunnel start, not on write.
+    public var directDNS: [String]?
     /// Named exits keyed by `ExitName`-validated names.
     public var exits: [String: Exit]
 
@@ -20,14 +23,20 @@ public struct ElsewhereConfig: Codable, Sendable, Equatable {
         default: String? = nil,
         bindInterface: BindInterface = .auto,
         userAgent: UserAgent = .chrome,
+        directDNS: [String]? = nil,
         exits: [String: Exit] = [:]
     ) {
         self.version = version
         self.`default` = `default`
         self.bindInterface = bindInterface
         self.userAgent = userAgent
+        self.directDNS = directDNS
         self.exits = exits
     }
+
+    /// The servers `direct` resolves through — the configured list, or
+    /// ``DirectDNS/defaults`` when `directDNS` is unset.
+    public var directDNSServers: [String] { directDNS ?? DirectDNS.defaults }
 
     public init(from decoder: any Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -35,6 +44,7 @@ public struct ElsewhereConfig: Codable, Sendable, Equatable {
         `default` = try container.decodeIfPresent(String.self, forKey: .default)
         bindInterface = try container.decodeIfPresent(BindInterface.self, forKey: .bindInterface) ?? .auto
         userAgent = try container.decodeIfPresent(UserAgent.self, forKey: .userAgent) ?? .chrome
+        directDNS = try container.decodeIfPresent([String].self, forKey: .directDNS)
         exits = try container.decodeIfPresent([String: Exit].self, forKey: .exits) ?? [:]
     }
 
@@ -46,11 +56,14 @@ public struct ElsewhereConfig: Codable, Sendable, Equatable {
         try container.encodeIfPresent(`default`, forKey: .default)
         try container.encode(bindInterface, forKey: .bindInterface)
         try container.encode(userAgent, forKey: .userAgent)
+        // IfPresent like `default`: a fresh file carries no `directDNS` key, so
+        // a later defaults change is not frozen into every existing config.
+        try container.encodeIfPresent(directDNS, forKey: .directDNS)
         try container.encode(exits, forKey: .exits)
     }
 
     enum CodingKeys: String, CodingKey {
-        case version, `default`, bindInterface, userAgent, exits
+        case version, `default`, bindInterface, userAgent, directDNS, exits
     }
 }
 

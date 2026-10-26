@@ -11,7 +11,10 @@ public enum ExitValidator {
     ///   scrubbed of the exit's secrets and anything secret-shaped — or `.exit` for a
     ///   structurally wrong exit (a link converting to a wrong count, a wrapper that
     ///   isn't exactly one outbound).
-    public static func validate(_ exit: Exit, named name: String) async throws(ElsewhereError)
+    public static func validate(
+        _ exit: Exit, named name: String,
+        directDNS: [String] = DirectDNS.defaults
+    ) async throws(ElsewhereError)
         -> Exit
     {
         switch exit {
@@ -22,12 +25,14 @@ public enum ExitValidator {
             else { return exit }
             try await assertBuildable(
                 outbound, named: name,
-                secrets: Redactor.secrets(inLink: link) + [link])
+                secrets: Redactor.secrets(inLink: link) + [link],
+                directDNS: directDNS)
             return exit
         case .xray:
             guard let outbound = try await ExitResolver.outbound(for: exit, named: name)
             else { return exit }
-            try await assertBuildable(outbound, named: name, secrets: [])
+            try await assertBuildable(
+                outbound, named: name, secrets: [], directDNS: directDNS)
             return .xray(outbound) // stored unwrapped — what `exits list` reads
         }
     }
@@ -38,7 +43,8 @@ public enum ExitValidator {
     /// `TunnelSession` gates each exit through the same check so one bad outbound
     /// is isolated instead of sinking `open`.
     static func assertBuildable(
-        _ outbound: JSONValue, named name: String, secrets: [String]
+        _ outbound: JSONValue, named name: String, secrets: [String],
+        directDNS: [String] = DirectDNS.defaults
     ) async throws(ElsewhereError) {
         let ports: [UInt16]
         do throws(XrayError) {
@@ -48,7 +54,7 @@ public enum ExitValidator {
         }
         let built = try XrayConfigBuilder.build(
             exits: [(name, outbound)], ports: [name: ports[0]],
-            directPort: ports[1], bindInterface: nil, log: .silent)
+            directPort: ports[1], bindInterface: nil, directDNS: directDNS, log: .silent)
         do throws(XrayError) {
             try await XrayCore.shared.test(configJSON: built.configJSON)
         } catch {
