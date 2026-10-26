@@ -33,27 +33,31 @@ public enum DirectDNS {
     /// (`app/dns/nameserver_doh.go` L133–148 at v26.10.21). The scheme is exactly
     /// `https` — `https+local://` dials the system resolver directly — and
     /// userinfo is refused: this file holds secrets, so an entry is echoed only
-    /// scrubbed (userinfo out, then the pattern net). An empty list fails too:
-    /// a direct lane with no resolver fails every hostname lookup anyway — say
-    /// so up front.
-    /// - Throws: `.config` naming the offending entry, scrubbed.
+    /// sanitized — `Redactor.redact(url:)` when it parses (userinfo gone,
+    /// scheme/host/path kept — what the user needs to see), `scrubPatterns`
+    /// when it does not. An empty list fails too: a direct lane with no
+    /// resolver fails every hostname lookup anyway — say so up front.
+    /// - Throws: `.config` naming the entry's index and its sanitized form.
     public static func validate(_ servers: [String]) throws(ElsewhereError) {
         guard !servers.isEmpty else {
             throw .config(
                 "directDNS is empty — the direct lane needs at least one DoH server")
         }
-        for entry in servers {
-            guard let url = URL(string: entry),
+        for (index, entry) in servers.enumerated() {
+            let url = URL(string: entry)
+            let shown = url.map(Redactor.redact(url:)) ?? Redactor.scrubPatterns(entry)
+            let credentialed = url?.user != nil || url?.password != nil
+            guard let url,
                 url.scheme == "https",
-                url.user == nil, url.password == nil,
+                !credentialed,
                 let host = url.host(percentEncoded: false),
                 IPv4Address(host) != nil || IPv6Address(host) != nil,
                 !url.path().isEmpty
             else {
                 throw .config(
-                    "directDNS entry '\(Redactor.scrubPatterns(Redactor.redactUserinfo(in: entry)))' "
-                        + "must be https://<ip>/path — "
-                        + "a hostname would need the system resolver to bootstrap")
+                    "directDNS[\(index)] '\(shown)' must be https://<ip>/path — "
+                        + "a hostname would need the system resolver to bootstrap"
+                        + (credentialed ? " (credentials are refused)" : ""))
             }
         }
     }
