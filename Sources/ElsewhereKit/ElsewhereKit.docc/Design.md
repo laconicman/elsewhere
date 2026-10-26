@@ -77,7 +77,16 @@ the `inboundTag: ["dns"]` rule steers onto `out:direct` — unmatched, they woul
 the FIRST outbound, an exit (`app/dns/dns.go` L89–145, `app/dispatcher/default.go`
 L433–464). `ForceIPv4v6` — not `UseIP*` — because `UseIP*` falls through to dialing
 by domain via the system resolver on a lookup failure (`transport/internet/dialer.go`
-L250–281, `freedom.go` L295–302). **Rejected:** resolving in Swift (URLSession has no
+L250–281, `freedom.go` L295–302). `DirectDNS` refusing an empty list is
+load-bearing, not pedantry: an *empty* `dns.servers` makes Xray add a
+`localhost` system-resolver client (`app/dns/dns.go` L168–170) — the very thing
+`direct` exists to avoid. The module caches positive answers by TTL and never
+negatives (`app/dns/cache_controller.go`): a `serve` tunnel keeps an answer
+until its TTL while a per-call `fetch` builds a fresh module — ordinary DNS. And
+a fully dead DNS path does not say "DNS failed": seven servers at the 4 s
+per-server default (`app/dns/nameserver.go` L139–141) outrun the 25 s fetch
+budget, so it surfaces as the fetch's timeout — `doctor`'s `resolver` row is
+where to look. **Rejected:** resolving in Swift (URLSession has no
 `--resolve`; TLS runs on the hostname end-to-end, so the IP has nowhere to go but back
 into Xray), `https+local://` DoH URLs (they bypass routing onto the system dialer —
 `app/dns/nameserver.go` L53–63), hostname-based DoH URLs (their bootstrap lookup needs
