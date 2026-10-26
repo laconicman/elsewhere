@@ -13,7 +13,8 @@ struct FetchCommand: AsyncParsableCommand {
         commandName: "fetch",
         abstract: "Fetch one URL through an exit; the body goes to stdout, metadata to stderr or --json.",
         discussion: """
-        Defaults: GET, up to \(FetchLimits.maxRedirects) redirects,
+        Defaults: GET, up to \(FetchLimits.maxRedirects) redirects
+        (--no-redirects returns the 3xx itself),
         \(FetchLimits.timeout.components.seconds) s timeout,
         a \(FetchLimits.maxBodyBytes / 1_000_000) MB body cap (truncated bodies are
         flagged), a Chrome User-Agent unless --user-agent says otherwise.
@@ -53,6 +54,9 @@ struct FetchCommand: AsyncParsableCommand {
 
     @Flag(help: "Allow private/local destinations (off by default — see elsewhere(1)).")
     var allowPrivate = false
+
+    @Flag(help: "Do not follow redirects; the 3xx response is the result and its location header says where it pointed.")
+    var noRedirects = false
 
     @Flag(help: "Print a JSON result object on stdout instead of the body.")
     var json = false
@@ -117,6 +121,7 @@ struct FetchCommand: AsyncParsableCommand {
                             headers: requestHeaders,
                             userAgent: ua,
                             timeout: .seconds(timeout),
+                            maxRedirects: noRedirects ? 0 : FetchLimits.maxRedirects,
                             allowPrivate: allowPrivate),
                         via: route)
                 }

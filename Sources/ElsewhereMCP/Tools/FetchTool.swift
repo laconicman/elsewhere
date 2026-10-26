@@ -12,12 +12,14 @@ extension ToolSpec {
         var maxLength: Int?
         var startIndex: Int?
         var raw: Bool?
+        var followRedirects: Bool?
 
         enum CodingKeys: String, CodingKey {
             case url, exit
             case maxLength = "max_length"
             case startIndex = "start_index"
             case raw
+            case followRedirects = "follow_redirects"
         }
     }
 
@@ -41,7 +43,9 @@ extension ToolSpec {
             5000, at most 200000) characters from `start_index` (default 0), and a \
             `<elsewhere:truncated next_start_index=N total=T>` marker when more \
             remains — call again with start_index = N. `raw: true` returns the page's \
-            text without HTML→Markdown conversion.
+            text without HTML→Markdown conversion. `follow_redirects: false` \
+            (default true) does not follow redirects — the 3xx response is the \
+            result and its `location` header line says where it pointed.
             """,
             schema: InputSchema.object([
                 "url": InputSchema.string("The URL to fetch (http/https)."),
@@ -54,6 +58,8 @@ extension ToolSpec {
                     minimum: 0),
                 "raw": InputSchema.boolean(
                     "Return the decoded text without HTML→Markdown conversion (default false)."),
+                "follow_redirects": InputSchema.boolean(
+                    "Follow redirects (default true); false returns the 3xx response itself — its location header says where it pointed."),
             ], required: ["url"]),
             annotations: .init(
                 readOnlyHint: true, destructiveHint: false,
@@ -81,6 +87,8 @@ extension ToolSpec {
                     FetchRequest(
                         url: target,
                         userAgent: lease.config.userAgent.headerValue,
+                        maxRedirects: (input.followRedirects ?? true)
+                            ? FetchLimits.maxRedirects : 0,
                         allowPrivate: context.options.allowPrivate),
                     via: lease.session.route(for: exitName))
                 await context.tunnel.release()
@@ -113,6 +121,11 @@ extension ToolSpec {
             "content-type: \(result.contentType ?? "-")",
             "exit: \(result.exit) · \(milliseconds(result.elapsed)) ms",
         ]
+        // With `follow_redirects: false` the 3xx is the result — surface the
+        // hop target (already userinfo-scrubbed in `headers`).
+        if let location = result.headers["location"] {
+            lines.append("location: \(location)")
+        }
         if result.truncated {
             lines.append(
                 "note: body cut at the \(FetchLimits.maxBodyBytes / 1_000_000) MB cap")

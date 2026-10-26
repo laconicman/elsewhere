@@ -99,6 +99,20 @@ struct FetcherTests {
         }
     }
 
+    /// `--no-redirects` (`maxRedirects: 0`): the 3xx itself is the result — the
+    /// Location header says where it pointed, `redirects` stays empty.
+    @Test func aStoppedRedirectIsTheResult() async throws {
+        try await withServerAndRoute { route, base in
+            var stop = request(base.appendingPathComponent("redir"))
+            stop.maxRedirects = 0
+            let result = try await Fetcher.fetch(stop, via: route)
+            #expect(result.status == 302)
+            #expect(result.headers["location"] == "/ok")
+            #expect(result.redirects.isEmpty)
+            #expect(result.finalURL == result.requestURL)
+        }
+    }
+
     @Test func aRedirectLoopHitsTheLimit() async throws {
         try await withServerAndRoute { route, base in
             do {

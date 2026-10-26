@@ -45,6 +45,29 @@ struct RedirectPolicyTests {
         }
     }
 
+    /// `maxRedirects == 0` is "do not follow", not "the limit is already hit" —
+    /// the 3xx completes as the result instead of an error.
+    @Test func aZeroLimitStopsTheFirstHop() throws {
+        let decision = RedirectPolicy.decide(
+            hop: try #require(URL(string: "https://example.org/next")),
+            count: 1, limits: request(maxRedirects: 0))
+        guard case .stop = decision else {
+            Issue.record("expected .stop, got \(decision)")
+            return
+        }
+    }
+
+    /// Even a private hop under `.stop` is not judged — the response stands.
+    @Test func aZeroLimitStopsEvenAPrivateHop() throws {
+        let decision = RedirectPolicy.decide(
+            hop: try #require(URL(string: "http://169.254.169.254/")),
+            count: 1, limits: request(maxRedirects: 0))
+        guard case .stop = decision else {
+            Issue.record("expected .stop, got \(decision)")
+            return
+        }
+    }
+
     @Test func aPrivateHopIsRefused() throws {
         let decision = RedirectPolicy.decide(
             hop: try #require(URL(string: "http://169.254.169.254/")),

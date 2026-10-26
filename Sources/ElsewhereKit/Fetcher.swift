@@ -96,10 +96,15 @@ public enum RedirectPolicy {
     public enum Decision: Sendable {
         case follow
         case refuse(ElsewhereError)
+        /// `maxRedirects == 0`: not a breach — the 3xx is the fetch's result.
+        case stop
     }
 
     /// `count` is this hop's ordinal — hop `maxRedirects + 1` is refused.
     public static func decide(hop: URL, count: Int, limits: FetchRequest) -> Decision {
+        // Zero is "do not follow", not "zero hops allowed, then an error" —
+        // checked before the limit so the 3xx completes as the result.
+        if limits.maxRedirects == 0 { return .stop }
         if count > limits.maxRedirects {
             return .refuse(.fetch("redirect limit (\(limits.maxRedirects)) reached"))
         }
@@ -166,7 +171,8 @@ enum ProxySessionFactory {
 /// The redirect bookkeeping `URLSessionTaskDelegate` gives us: each hop through
 /// ``RedirectPolicy/decide(hop:count:limits:)`` — `.follow` records the hop and passes
 /// the request on; `.refuse` returns nil (URLSession stops and answers with the pre-hop
-/// response) and records the error for the fetch to rethrow afterwards.
+/// response) and records the error for the fetch to rethrow afterwards; `.stop`
+/// returns nil and records nothing — the 3xx itself is the result.
 final class RedirectDelegate: NSObject, URLSessionTaskDelegate {
     private struct State {
         var hopCount = 0
@@ -190,6 +196,12 @@ final class RedirectDelegate: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
+        // `.stop` judges nothing — even a Location that won't parse completes as
+        // the 3xx result; nothing is recorded and `redirects` stays empty.
+        if self.request.maxRedirects == 0 {
+            completionHandler(nil)
+            return
+        }
         guard let hop = request.url else {
             state.withLock { $0.refused = .fetch("redirect to an unparseable URL") }
             completionHandler(nil)
@@ -204,6 +216,9 @@ final class RedirectDelegate: NSObject, URLSessionTaskDelegate {
             completionHandler(request)
         case .refuse(let error):
             state.withLock { $0.refused = error }
+            completionHandler(nil)
+        case .stop:
+            // `maxRedirects` is checked above — unreachable, and the same answer.
             completionHandler(nil)
         }
     }
