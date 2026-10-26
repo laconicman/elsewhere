@@ -121,8 +121,8 @@ extension ToolSpec {
             "content-type: \(result.contentType ?? "-")",
             "exit: \(result.exit) · \(milliseconds(result.elapsed)) ms",
         ]
-        // With `follow_redirects: false` the 3xx is the result — surface the
-        // hop target (already userinfo-scrubbed in `headers`).
+        // Any response carrying a Location header gets the line — a stopped
+        // 3xx is the common case (already userinfo-scrubbed in `headers`).
         if let location = result.headers["location"] {
             lines.append("location: \(location)")
         }

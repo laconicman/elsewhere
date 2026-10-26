@@ -202,6 +202,16 @@ struct FetchCommand: AsyncParsableCommand {
                 break // --head takes its own branch above; .none can't reach here
             }
         }
+        if !json && !head, let location = result.headers["location"] {
+            // A stopped 3xx's body is usually empty — the header is where it
+            // pointed (`--head`/`--json` already show it). host + path, no
+            // scheme — the pattern scrub strips `scheme://` tokens; a relative
+            // Location survives as-is.
+            let target = URL(string: location).flatMap { url in
+                url.host(percentEncoded: false).map { $0 + url.path() }
+            } ?? location
+            printError("location: \(target)")
+        }
         if result.truncated {
             printError("body truncated at \(FetchLimits.maxBodyBytes / 1_000_000) MB")
         }
