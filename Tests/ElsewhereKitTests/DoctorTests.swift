@@ -70,8 +70,10 @@ struct DoctorTests {
         #expect(checks["config"]?.verdict == .failure)
         #expect(checks["engine"]?.verdict == .ok)
         // The battery is fixed: the row reports the skip rather than vanishing.
-        #expect(checks["xray config"]?.verdict == .info)
-        #expect(checks["xray config"]?.detail == "skipped — no resolvable exits")
+        // The battery is fixed: with no exits the check validates the
+        // direct-only config `fetch --direct` would build — it must not skip.
+        #expect(checks["xray config"]?.verdict == .ok)
+        #expect(checks["xray config"]?.detail == "assembles and validates (1 inbounds)")
         #expect(!Doctor.lines(checks).isEmpty)
     }
 
@@ -127,6 +129,19 @@ struct DoctorTests {
         #expect(
             checks["xray config"]?.detail.contains("validated unbound — interface unresolved")
                 == true)
+    }
+
+    /// The direct-only path is real — `fetch --direct` with zero exits builds
+    /// exactly this config — so a bad `directDNS` fails the `xray config` row
+    /// here, not first at tunnel start.
+    @Test func anInvalidDirectDNSFailsTheXrayConfigCheck() async throws {
+        let store = store()
+        try store.save(ElsewhereConfig(directDNS: []))
+        let checks = await Doctor.run(
+            store: store, environment: [:], localProxyPort: 9,
+            interfaceResolver: { _ in "en0" })
+        #expect(checks["xray config"]?.verdict == .failure)
+        #expect(checks["xray config"]?.detail.contains("directDNS") == true)
     }
 
     /// A tunnel-owned resolver is a warning that names where `direct` differs:

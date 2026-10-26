@@ -247,12 +247,10 @@ public enum Doctor {
 
         // 7. The assembled config passes the engine's own validation — the live proof
         // that a converted outbound splices (C5 §3: `test` binds no sockets). The row
-        // is never absent: a skip is reported, keeping the battery fixed.
-        if resolved.isEmpty {
-            checks.append(Check(
-                name: "xray config", verdict: .info,
-                detail: "skipped — no resolvable exits"))
-        } else if ports.count != resolved.count + 1 {
+        // is never absent: a skip is reported, keeping the battery fixed. With zero
+        // resolvable exits this is the direct-only config `fetch --direct` builds —
+        // the check covers `directDNS` too, so it must not skip.
+        if ports.count != resolved.count + 1 {
             checks.append(Check(
                 name: "xray config", verdict: .info,
                 detail: "skipped — no port candidates"))
