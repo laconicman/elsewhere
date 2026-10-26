@@ -101,10 +101,14 @@ public enum RedirectPolicy {
     }
 
     /// `count` is this hop's ordinal — hop `maxRedirects + 1` is refused.
-    public static func decide(hop: URL, count: Int, limits: FetchRequest) -> Decision {
-        // Zero is "do not follow", not "zero hops allowed, then an error" —
-        // checked before the limit so the 3xx completes as the result.
+    /// Judgement order: zero means "do not follow" — the 3xx completes as the
+    /// result and nothing is judged or recorded; an unparseable `Location`
+    /// (a nil `hop`) is refused; then the limit, then the private-address guard.
+    public static func decide(hop: URL?, count: Int, limits: FetchRequest) -> Decision {
         if limits.maxRedirects == 0 { return .stop }
+        guard let hop else {
+            return .refuse(.fetch("redirect to an unparseable URL"))
+        }
         if count > limits.maxRedirects {
             return .refuse(.fetch("redirect limit (\(limits.maxRedirects)) reached"))
         }
@@ -196,29 +200,20 @@ final class RedirectDelegate: NSObject, URLSessionTaskDelegate {
         newRequest request: URLRequest,
         completionHandler: @escaping @Sendable (URLRequest?) -> Void
     ) {
-        // `.stop` judges nothing — even a Location that won't parse completes as
-        // the 3xx result; nothing is recorded and `redirects` stays empty.
-        if self.request.maxRedirects == 0 {
-            completionHandler(nil)
-            return
-        }
-        guard let hop = request.url else {
-            state.withLock { $0.refused = .fetch("redirect to an unparseable URL") }
-            completionHandler(nil)
-            return
-        }
         switch state.withLock({ s -> RedirectPolicy.Decision in
             s.hopCount += 1
-            return RedirectPolicy.decide(hop: hop, count: s.hopCount, limits: self.request)
+            return RedirectPolicy.decide(
+                hop: request.url, count: s.hopCount, limits: self.request)
         }) {
         case .follow:
-            state.withLock { $0.hops.append(hop) }
+            if let hop = request.url { state.withLock { $0.hops.append(hop) } }
             completionHandler(request)
         case .refuse(let error):
             state.withLock { $0.refused = error }
             completionHandler(nil)
         case .stop:
-            // `maxRedirects` is checked above — unreachable, and the same answer.
+            // "Do not follow" judges nothing — the 3xx is the result and
+            // `redirects` stays empty.
             completionHandler(nil)
         }
     }

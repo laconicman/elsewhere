@@ -16,7 +16,7 @@ struct RedirectPolicyTests {
 
     @Test func aPublicHopIsFollowed() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "https://example.org/next")),
+            hop: URL(string: "https://example.org/next"),
             count: 1, limits: request())
         guard case .follow = decision else {
             Issue.record("expected .follow, got \(decision)")
@@ -26,7 +26,7 @@ struct RedirectPolicyTests {
 
     @Test func theHopBeyondTheLimitIsRefused() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "https://example.org/next")),
+            hop: URL(string: "https://example.org/next"),
             count: 11, limits: request(maxRedirects: 10))
         guard case .refuse(.fetch(let message)) = decision else {
             Issue.record("expected .refuse(.fetch), got \(decision)")
@@ -37,7 +37,7 @@ struct RedirectPolicyTests {
 
     @Test func theLimitHopItselfIsFollowed() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "https://example.org/next")),
+            hop: URL(string: "https://example.org/next"),
             count: 10, limits: request(maxRedirects: 10))
         guard case .follow = decision else {
             Issue.record("expected .follow, got \(decision)")
@@ -49,7 +49,7 @@ struct RedirectPolicyTests {
     /// the 3xx completes as the result instead of an error.
     @Test func aZeroLimitStopsTheFirstHop() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "https://example.org/next")),
+            hop: URL(string: "https://example.org/next"),
             count: 1, limits: request(maxRedirects: 0))
         guard case .stop = decision else {
             Issue.record("expected .stop, got \(decision)")
@@ -60,8 +60,29 @@ struct RedirectPolicyTests {
     /// Even a private hop under `.stop` is not judged — the response stands.
     @Test func aZeroLimitStopsEvenAPrivateHop() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "http://169.254.169.254/")),
+            hop: URL(string: "http://169.254.169.254/"),
             count: 1, limits: request(maxRedirects: 0))
+        guard case .stop = decision else {
+            Issue.record("expected .stop, got \(decision)")
+            return
+        }
+    }
+
+    /// A `Location` URL can't parse is a refusal, not a follow.
+    @Test func anUnparseableHopIsRefused() {
+        let decision = RedirectPolicy.decide(
+            hop: nil, count: 1, limits: request())
+        guard case .refuse(.fetch(let message)) = decision else {
+            Issue.record("expected .refuse(.fetch), got \(decision)")
+            return
+        }
+        #expect(message.contains("unparseable"))
+    }
+
+    /// `.stop` judges before the hop is even looked at — nil or not.
+    @Test func aZeroLimitStopsAnUnparseableHop() {
+        let decision = RedirectPolicy.decide(
+            hop: nil, count: 1, limits: request(maxRedirects: 0))
         guard case .stop = decision else {
             Issue.record("expected .stop, got \(decision)")
             return
@@ -70,7 +91,7 @@ struct RedirectPolicyTests {
 
     @Test func aPrivateHopIsRefused() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "http://169.254.169.254/")),
+            hop: URL(string: "http://169.254.169.254/"),
             count: 1, limits: request())
         guard case .refuse(.refused) = decision else {
             Issue.record("expected .refuse(.refused), got \(decision)")
@@ -80,7 +101,7 @@ struct RedirectPolicyTests {
 
     @Test func allowPrivateFollowsAPrivateHop() throws {
         let decision = RedirectPolicy.decide(
-            hop: try #require(URL(string: "http://127.0.0.1/")),
+            hop: URL(string: "http://127.0.0.1/"),
             count: 1, limits: request(allowPrivate: true))
         guard case .follow = decision else {
             Issue.record("expected .follow, got \(decision)")
