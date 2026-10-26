@@ -33,8 +33,9 @@ public enum SystemResolver {
         let servers = dictionary["ServerAddresses"] as? [String] ?? []
         var interface: String?
         // Darwin's `if_indextoname(3)` writes into a caller buffer; nil return
-        // means the index names nothing.
-        if let index = dictionary["__IF_INDEX__"] as? Int {
+        // means the index names nothing. `String(cString:)` on a [CChar] warns
+        // under Swift 6.4 — the prefix/map decode is the current spelling.
+        if let index = dictionary["__IF_INDEX__"] as? Int, index > 0 {
             var buffer = [CChar](repeating: 0, count: Int(IF_NAMESIZE))
             if if_indextoname(UInt32(index), &buffer) != nil {
                 interface = String(
