@@ -58,6 +58,22 @@ struct DirectDNSTests {
         } catch { Issue.record("expected .config, got \(error)") }
     }
 
+    /// The contract is `https://<ip>/path` exactly — a query, a fragment or a
+    /// bare `/` path are all refused.
+    @Test(arguments: [
+        "https://1.1.1.1/dns-query?dns=AA==",
+        "https://1.1.1.1/dns-query#frag",
+        "https://1.1.1.1/",
+    ])
+    func aQueryFragmentOrBarePathIsRefused(entry: String) {
+        do {
+            try DirectDNS.validate([entry])
+            Issue.record("expected .config")
+        } catch ElsewhereError.config(let message) {
+            #expect(message.contains("directDNS[0]"))
+        } catch { Issue.record("expected .config, got \(error)") }
+    }
+
     /// The defaults and a hand-mixed list validate; only the contract breaks.
     @Test func theDefaultsValidate() throws {
         try DirectDNS.validate(DirectDNS.defaults)

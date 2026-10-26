@@ -35,8 +35,11 @@ public enum DirectDNS {
     /// userinfo is refused: this file holds secrets, so an entry is echoed only
     /// sanitized — `Redactor.redact(url:)` when it parses (userinfo gone,
     /// scheme/host/path kept — what the user needs to see), `scrubPatterns`
-    /// when it does not. An empty list fails too: a direct lane with no
-    /// resolver fails every hostname lookup anyway — say so up front.
+    /// when it does not. Query and fragment are refused too, and the path must
+    /// be more than `/` — the contract is `https://<ip>/path`, nothing else. An
+    /// empty list fails too — and must: an empty `dns.servers` would make Xray
+    /// add a `localhost` system-resolver client (`app/dns/dns.go` L168–170),
+    /// the very resolver `direct` exists to avoid.
     /// - Throws: `.config` naming the entry's index and its sanitized form.
     public static func validate(_ servers: [String]) throws(ElsewhereError) {
         guard !servers.isEmpty else {
@@ -52,7 +55,8 @@ public enum DirectDNS {
                 !credentialed,
                 let host = url.host(percentEncoded: false),
                 IPv4Address(host) != nil || IPv6Address(host) != nil,
-                !url.path().isEmpty
+                url.path().count > 1,
+                url.query == nil, url.fragment == nil
             else {
                 throw .config(
                     "directDNS[\(index)] '\(shown)' must be https://<ip>/path — "
