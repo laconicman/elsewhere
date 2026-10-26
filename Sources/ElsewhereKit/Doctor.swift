@@ -38,6 +38,7 @@ public enum Doctor {
         environment: [String: String],
         localProxyPort: UInt16 = LocalProxy.incyPort,
         interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve,
+        systemResolver: @Sendable () -> SystemResolver.Snapshot? = SystemResolver.snapshot,
         portCandidates: (@Sendable (Int, [UInt16]) async throws -> [UInt16])? = nil
     ) async -> [Check] {
         var checks: [Check] = []
@@ -194,6 +195,27 @@ public enum Doctor {
                             + "to run via the system path"))
                 }
             }
+        }
+
+        // 5b. The system resolver. `direct` never touches it — its DoH queries
+        // ride the bound lane — but a tunnel-owned fake-IP resolver is what made
+        // TD-4 bite, and `--via-system` plus every other tool still follow it.
+        if let snapshot = systemResolver() {
+            let whereabouts = "system resolver \(snapshot.servers.joined(separator: ", "))"
+                + (snapshot.interface.map { " on \($0)" } ?? "")
+            if SystemResolver.looksTunnelOwned(snapshot) {
+                checks.append(Check(
+                    name: "resolver", verdict: .warning,
+                    detail: "\(whereabouts) is tunnel-owned (fake-IP style); direct "
+                        + "resolves names itself over DoH, --via-system and other "
+                        + "tools follow the tunnel"))
+            } else {
+                checks.append(Check(name: "resolver", verdict: .ok, detail: whereabouts))
+            }
+        } else {
+            checks.append(Check(
+                name: "resolver", verdict: .info,
+                detail: "no system resolver configured"))
         }
 
         // 6. Candidate ports — one per resolved exit + one for `direct`, never INCY's
