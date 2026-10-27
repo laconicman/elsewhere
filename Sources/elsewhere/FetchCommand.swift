@@ -204,10 +204,12 @@ struct FetchCommand: AsyncParsableCommand {
         }
         if !json && !head, let location = result.headers["location"] {
             // A stopped 3xx's body is usually empty — the header is where it
-            // pointed (`--head`/`--json` already show it). Everything after the
-            // scheme — host[:port], path, query, fragment — with userinfo gone;
-            // no `scheme://` token remains, so printError's pattern scrub leaves
-            // it alone. A relative Location has no `://` and passes through.
+            // pointed (`--head`/`--json` already show it). The Location is
+            // where the page sent us — data, by the same rule as `--json`'s
+            // `redirects`: `Redactor.redact(url:)` keeps the query; only
+            // userinfo is a credential class. The scheme is dropped so
+            // stderr's blanket URL scrub does not erase the line. A relative
+            // Location has no `://` and passes through.
             let target = URL(string: location).map { url in
                 let redacted = Redactor.redact(url: url)
                 return redacted.range(of: "://").map {
