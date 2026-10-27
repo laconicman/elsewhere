@@ -13,7 +13,8 @@ struct FetchCommand: AsyncParsableCommand {
         commandName: "fetch",
         abstract: "Fetch one URL through an exit; the body goes to stdout, metadata to stderr or --json.",
         discussion: """
-        Defaults: GET, up to \(FetchLimits.maxRedirects) redirects,
+        Defaults: GET, up to \(FetchLimits.maxRedirects) redirects
+        (--no-redirects returns the 3xx itself),
         \(FetchLimits.timeout.components.seconds) s timeout,
         a \(FetchLimits.maxBodyBytes / 1_000_000) MB body cap (truncated bodies are
         flagged), a Chrome User-Agent unless --user-agent says otherwise.
@@ -53,6 +54,9 @@ struct FetchCommand: AsyncParsableCommand {
 
     @Flag(help: "Allow private/local destinations (off by default — see elsewhere(1)).")
     var allowPrivate = false
+
+    @Flag(help: "Do not follow redirects; the 3xx response is the result and its location header says where it pointed.")
+    var noRedirects = false
 
     @Flag(help: "Print a JSON result object on stdout instead of the body.")
     var json = false
@@ -117,6 +121,7 @@ struct FetchCommand: AsyncParsableCommand {
                             headers: requestHeaders,
                             userAgent: ua,
                             timeout: .seconds(timeout),
+                            maxRedirects: noRedirects ? 0 : FetchLimits.maxRedirects,
                             allowPrivate: allowPrivate),
                         via: route)
                 }
@@ -196,6 +201,22 @@ struct FetchCommand: AsyncParsableCommand {
             case .none:
                 break // --head takes its own branch above; .none can't reach here
             }
+        }
+        if !json && !head, let location = result.headers["location"] {
+            // A stopped 3xx's body is usually empty — the header is where it
+            // pointed (`--head`/`--json` already show it). The Location is
+            // where the page sent us — data, by the same rule as `--json`'s
+            // `redirects`: `Redactor.redact(url:)` keeps the query; only
+            // userinfo is a credential class. The scheme is dropped so
+            // stderr's blanket URL scrub does not erase the line. A relative
+            // Location has no `://` and passes through.
+            let target = URL(string: location).map { url in
+                let redacted = Redactor.redact(url: url)
+                return redacted.range(of: "://").map {
+                    String(redacted[$0.upperBound...])
+                } ?? redacted
+            } ?? location
+            printError("location: \(target)")
         }
         if result.truncated {
             printError("body truncated at \(FetchLimits.maxBodyBytes / 1_000_000) MB")

@@ -71,6 +71,21 @@ struct FetchToolTests {
         #expect(!missing.isError)
         #expect(missing.text.contains("\nstatus: 404\n"), "\(missing.text)")
 
+        // `follow_redirects: false` — the 3xx is the result, `location` says
+        // where it pointed.
+        let stopped = try await toolbox.reply(
+            "elsewhere_fetch",
+            ["url": "\(base)/redir", "exit": "direct", "follow_redirects": false])
+        #expect(!stopped.isError)
+        #expect(stopped.text.contains("\nstatus: 302\n"), "\(stopped.text)")
+        #expect(stopped.text.contains("\nlocation: /ok\n"), "\(stopped.text)")
+
+        // …and the default still follows.
+        let followed = try await toolbox.reply(
+            "elsewhere_fetch", ["url": "\(base)/redir", "exit": "direct"])
+        #expect(!followed.isError)
+        #expect(followed.text.contains("\nstatus: 200\n"), "\(followed.text)")
+
         await context.tunnel.close(reason: "eof")
         #expect(await XrayCore.shared.isRunning == false)
     }

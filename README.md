@@ -61,7 +61,8 @@ elsewhere exits list
 
 The first exit added becomes the default; `elsewhere exits default NAME` moves it.
 `elsewhere doctor` checks the whole chain — engine version, config permissions, every
-exit's conversion, the interface binding, port candidates, and the generated config
+exit's conversion, the interface binding, the system resolver (a tunnel-owned,
+fake-IP-style resolver warns), port candidates, and the generated config
 through the engine's own validator:
 
 ```sh
@@ -80,7 +81,8 @@ elsewhere run --exit moldova -- git clone https://…  # HTTP(S)_/ALL_PROXY expo
 lines, truncation and binary notices, the `HTTP <status>` note. `--json` prints the
 whole result object instead; `--head` prints status and headers; `--output FILE`
 saves the raw body. Defaults: GET, up to 10 redirects (each hop re-checked by the
-private-address guard), a 25 s timeout that bounds the *whole* fetch — a body that
+private-address guard; `--no-redirects` returns the 3xx itself — its `Location`
+header says where it pointed), a 25 s timeout that bounds the *whole* fetch — a body that
 trickles a byte at a time still hits it — a 5 MB body cap, and a Chrome User-Agent
 (`--user-agent` overrides). HTTP ≥ 400 is a *result*, not a failure — exit stays 0;
 the status is data the agent reads. Private/local destinations are refused unless
@@ -112,7 +114,7 @@ page had external scripts but renders under 200 characters, `fetch` appends
 little content._` rather than pretending the shell was the page.
 
 `--via-system` unbinds the engine's outbound sockets so they ride the system path —
-the system VPN when one is up. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) writes the
+the system VPN when one is up — name lookups included. `--xray-log PATH` (or `ELSEWHERE_XRAY_LOG`) writes the
 engine's warnings to a file; silent by default, since Xray's console log is stdout
 and stdout here is the payload. `run`'s child gets `HTTP_PROXY`/`HTTPS_PROXY` at
 `http://127.0.0.1:PORT` and `ALL_PROXY` at `socks5h://127.0.0.1:PORT` (the `h` keeps
@@ -142,6 +144,12 @@ holds the secrets. Hand-editable; a redacted shape:
 
 - `bindInterface`: `"auto"` (default — the current path's first physical interface),
   an interface name, or `"none"`. Applied to *every* outbound, including `direct`.
+- `directDNS`: the DoH servers `direct` resolves through — `https://<ip>/path`
+  URLs (an IP literal needs no bootstrap lookup; a hostname would fall back to
+  the system resolver). Unset means the built-in list: Cloudflare, Google, Quad9
+  (an IPv4 and an IPv6 each), then Yandex last. A bound `direct` fails loudly
+  when the lookup fails — it never asks the system resolver, which a tunnel
+  may own; `--via-system` unbinds the lookup too.
 - `userAgent`: `"chrome"` (default) or a literal string.
 - Exit names match `^[a-z0-9]([a-z0-9-]{0,30}[a-z0-9])?$` — DNS-label-shaped, so never
   a leading or trailing dash — and `direct`/`env` are reserved.
@@ -160,7 +168,7 @@ An agent calls the server over stdio — three tools, all read-only and idempote
 
 | Tool | Input | Output |
 |---|---|---|
-| `elsewhere_fetch` | `url` (required), `exit?`, `max_length?` (default 5000, at most 200000), `start_index?` (default 0), `raw?` (default false) | Four header lines — url, status, content-type, exit · elapsed — then the body as Markdown (`raw`: the decoded text without rendering), paged with the `<elsewhere:truncated …>` marker; HTTP ≥ 400 is a result, not an error |
+| `elsewhere_fetch` | `url` (required), `exit?`, `max_length?` (default 5000, at most 200000), `start_index?` (default 0), `raw?` (default false), `follow_redirects?` (default true) | Four header lines — url, status, content-type, exit · elapsed — then the body as Markdown (`raw`: the decoded text without rendering), paged with the `<elsewhere:truncated …>` marker; HTTP ≥ 400 is a result, not an error. `follow_redirects: false` returns the 3xx itself, with a `location:` line |
 | `elsewhere_whoami` | `exit?` | `exit NAME: ip <ip> loc <loc>[ colo <colo>]` — every configured exit plus `direct` when `exit` is omitted |
 | `elsewhere_exits` | — | The `exits list` lines (credentials redacted) plus `direct` |
 

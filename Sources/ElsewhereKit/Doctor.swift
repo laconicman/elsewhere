@@ -38,6 +38,7 @@ public enum Doctor {
         environment: [String: String],
         localProxyPort: UInt16 = LocalProxy.incyPort,
         interfaceResolver: @Sendable (BindInterface) async -> String? = InterfaceResolver.resolve,
+        systemResolver: @Sendable () -> SystemResolver.Snapshot? = SystemResolver.snapshot,
         portCandidates: (@Sendable (Int, [UInt16]) async throws -> [UInt16])? = nil
     ) async -> [Check] {
         var checks: [Check] = []
@@ -196,6 +197,27 @@ public enum Doctor {
             }
         }
 
+        // 5b. The system resolver. `direct` never touches it — its DoH queries
+        // ride the bound lane — but a tunnel-owned fake-IP resolver is what made
+        // TD-4 bite, and `--via-system` plus every other tool still follow it.
+        if let snapshot = systemResolver() {
+            let whereabouts = "system resolver \(snapshot.servers.joined(separator: ", "))"
+                + (snapshot.interface.map { " on \($0)" } ?? "")
+            if SystemResolver.looksTunnelOwned(snapshot) {
+                checks.append(Check(
+                    name: "resolver", verdict: .warning,
+                    detail: "\(whereabouts) is tunnel-owned (fake-IP style); direct "
+                        + "resolves names itself over DoH, --via-system and other "
+                        + "tools follow the tunnel"))
+            } else {
+                checks.append(Check(name: "resolver", verdict: .ok, detail: whereabouts))
+            }
+        } else {
+            checks.append(Check(
+                name: "resolver", verdict: .info,
+                detail: "no system resolver configured"))
+        }
+
         // 6. Candidate ports — one per resolved exit + one for `direct`, never INCY's
         // and never a loopback `proxy` exit's own: a re-issued port collides at run
         // time, not here (`test` binds nothing).
@@ -225,12 +247,10 @@ public enum Doctor {
 
         // 7. The assembled config passes the engine's own validation — the live proof
         // that a converted outbound splices (C5 §3: `test` binds no sockets). The row
-        // is never absent: a skip is reported, keeping the battery fixed.
-        if resolved.isEmpty {
-            checks.append(Check(
-                name: "xray config", verdict: .info,
-                detail: "skipped — no resolvable exits"))
-        } else if ports.count != resolved.count + 1 {
+        // is never absent: a skip is reported, keeping the battery fixed. With zero
+        // resolvable exits this is the direct-only config `fetch --direct` builds —
+        // the check covers `directDNS` too, so it must not skip.
+        if ports.count != resolved.count + 1 {
             checks.append(Check(
                 name: "xray config", verdict: .info,
                 detail: "skipped — no port candidates"))
@@ -242,7 +262,9 @@ public enum Doctor {
             do {
                 let built = try XrayConfigBuilder.build(
                     exits: resolved, ports: portsByName,
-                    directPort: ports[resolved.count], bindInterface: interface, log: .silent)
+                    directPort: ports[resolved.count], bindInterface: interface,
+                    directDNS: config?.directDNSServers ?? DirectDNS.defaults,
+                    log: .silent)
                 try await XrayCore.shared.test(configJSON: built.configJSON)
                 checks.append(Check(
                     name: "xray config", verdict: .ok,

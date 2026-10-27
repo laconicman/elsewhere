@@ -19,7 +19,9 @@ struct ServerTests {
 
     /// Each tool's schema argument names, sorted.
     static let argumentNames: [String: [String]] = [
-        "elsewhere_fetch": ["exit", "max_length", "raw", "start_index", "url"],
+        "elsewhere_fetch": [
+            "exit", "follow_redirects", "max_length", "raw", "start_index", "url",
+        ],
         "elsewhere_whoami": ["exit"],
         "elsewhere_exits": [],
     ]

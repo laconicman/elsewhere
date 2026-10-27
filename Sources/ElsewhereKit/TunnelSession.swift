@@ -100,7 +100,8 @@ public actor TunnelSession {
             let lanes = try await supervisor.start(
                 exits: xrayExits, includeDirect: includeDirect,
                 bindInterface: interface, log: log,
-                excludingPorts: excludedPorts)
+                excludingPorts: excludedPorts,
+                directDNS: config.directDNSServers)
             startedEngine = true
             for lane in lanes {
                 routes[lane.exitName] = .inbound(exit: lane.exitName, port: lane.inboundPort)

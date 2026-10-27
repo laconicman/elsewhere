@@ -35,6 +35,11 @@ public enum XrayConfigBuilder {
         case file(String)
     }
 
+    /// The `dns.tag` the dns module stamps on its outbound query sessions and the
+    /// `inboundTag` the steering rule matches — one string, one home
+    /// (`app/dns/dns.go` L89–145 + `app/dispatcher/default.go` L433–464 at v26.10.21).
+    static let dnsTag = "dns"
+
     /// - Parameters:
     ///   - exits: `(config name, converted outbound)` pairs — `proxy` exits never reach
     ///     here; URLSession talks to them directly (§5.5).
@@ -45,14 +50,24 @@ public enum XrayConfigBuilder {
     ///     built; `Doctor`/`ExitValidator` still validate the full shape).
     ///   - bindInterface: the resolved interface name (`nil` = `BindInterface.none` —
     ///     `--via-system`), applied to every outbound including `direct` (§3.3).
+    ///   - directDNS: the DoH servers `direct` resolves through — used only when
+    ///     the direct lane is *bound* (`bindInterface` non-nil): a bound lane
+    ///     gets its own resolver, an unbound one is simply the system path, name
+    ///     lookup included (`--via-system` keeps split-horizon/corporate DNS).
+    ///     Unbound, the block, the `dns` rule and the validation are all absent.
+    ///     A bound `direct` gets `ForceIPv4v6` so a failed lookup fails the
+    ///     fetch — never the system resolver (TD-4); exits stay `AsIs` and never
+    ///     touch the block.
     ///   - log: the `log` block — ``XrayLog/silent`` by default, since the engine's
     ///     console log writes to this process's stdout.
     /// - Returns: the JSON text (`.sortedKeys`, so goldens compare as text) and lanes.
+    /// - Throws: `.config` when `directDNS` fails ``DirectDNS/validate(_:)``.
     public static func build(
         exits: [(name: String, outbound: JSONValue)],
         ports: [String: UInt16],
         directPort: UInt16?,
         bindInterface: String?,
+        directDNS: [String] = DirectDNS.defaults,
         log: XrayLog = .silent
     ) throws(ElsewhereError) -> (configJSON: String, lanes: [Lane]) {
         var inbounds: [JSONValue] = []
@@ -74,31 +89,64 @@ public enum XrayConfigBuilder {
 
         // `direct` exists when the caller asks for it (`nil` = not this call, A9) —
         // and binds the interface too, so `--direct` is genuinely direct (§3.3).
+        var dns: JSONValue?
         if let directPort {
             inbounds.append(inbound(tag: "in:direct", port: directPort))
-            outbounds.append(try normalize(
-                .object(["protocol": .string("freedom")]),
-                tag: "out:direct", interface: bindInterface))
             rules.append(rule(inbound: "in:direct", outbound: "out:direct"))
             lanes.append(Lane(
                 exitName: "direct", inboundPort: directPort,
                 inboundTag: "in:direct", outboundTag: "out:direct"))
+            if let bindInterface {
+                // Bound lane, bound lookup (TD-4): `domainStrategy` lives in
+                // sockopt, where freedom's own field is migrated to
+                // (`infra/conf/xray.go` L415–430 at v26.10.21) — `ForceIPv4v6`,
+                // not `UseIP*`, which falls through to the system resolver on a
+                // failed lookup (freedom.go L295–302). The dns module's
+                // `https://` queries are ordinary outbound sessions — without
+                // the rule the FIRST outbound (an exit!) would carry them.
+                try DirectDNS.validate(directDNS)
+                outbounds.append(.object([
+                    "tag": .string("out:direct"),
+                    "protocol": .string("freedom"),
+                    "streamSettings": .object(["sockopt": .object([
+                        "domainStrategy": .string("ForceIPv4v6"),
+                        "interface": .string(bindInterface),
+                    ])]),
+                ]))
+                dns = .object([
+                    "servers": .array(directDNS.map { .string($0) }),
+                    "tag": .string(dnsTag),
+                ])
+                rules.append(rule(inbound: dnsTag, outbound: "out:direct"))
+            } else {
+                // `--via-system`: direct is simply the system path, name lookup
+                // included — the plain freedom outbound resolves through the
+                // system resolver (fake-IP answers are routable there, and a
+                // corporate split-horizon resolver keeps working), so
+                // `directDNS` is unused and unvalidated.
+                outbounds.append(try normalize(
+                    .object(["protocol": .string("freedom")]),
+                    tag: "out:direct", interface: nil))
+            }
         }
 
-        let root = JSONValue.object([
+        var root: [String: JSONValue] = [
             "log": logBlock(log),
             "inbounds": .array(inbounds),
             "outbounds": .array(outbounds),
-            // AsIs by inbound tag (§3.4): no `dns` block, destinations travel by hostname.
+            // AsIs by inbound tag (§3.4): destinations travel by hostname — only
+            // `direct` resolves, through its own DoH servers.
             "routing": .object([
                 "domainStrategy": .string("AsIs"),
                 "rules": .array(rules),
             ]),
-        ])
+        ]
+        // The `dns` block exists for `direct` alone: no direct lane, no block.
+        if let dns { root["dns"] = dns }
 
         do {
             let data = try JSONSerialization.data(
-                withJSONObject: root.anyValue, options: [.sortedKeys])
+                withJSONObject: JSONValue.object(root).anyValue, options: [.sortedKeys])
             return (String(decoding: data, as: UTF8.self), lanes)
         } catch {
             throw .config("cannot serialize generated Xray config: \(error.localizedDescription)")

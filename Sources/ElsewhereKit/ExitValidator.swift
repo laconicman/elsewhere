@@ -11,7 +11,9 @@ public enum ExitValidator {
     ///   scrubbed of the exit's secrets and anything secret-shaped — or `.exit` for a
     ///   structurally wrong exit (a link converting to a wrong count, a wrapper that
     ///   isn't exactly one outbound).
-    public static func validate(_ exit: Exit, named name: String) async throws(ElsewhereError)
+    public static func validate(
+        _ exit: Exit, named name: String
+    ) async throws(ElsewhereError)
         -> Exit
     {
         switch exit {
@@ -27,7 +29,8 @@ public enum ExitValidator {
         case .xray:
             guard let outbound = try await ExitResolver.outbound(for: exit, named: name)
             else { return exit }
-            try await assertBuildable(outbound, named: name, secrets: [])
+            try await assertBuildable(
+                outbound, named: name, secrets: [])
             return .xray(outbound) // stored unwrapped — what `exits list` reads
         }
     }
@@ -36,7 +39,9 @@ public enum ExitValidator {
     /// through the engine's own validator (`test` binds nothing, C5 §3). `freePorts`
     /// failure is `.engine` too: no ports, no validation. Internal, not private:
     /// `TunnelSession` gates each exit through the same check so one bad outbound
-    /// is isolated instead of sinking `open`.
+    /// is isolated instead of sinking `open`. It validates the exit's outbound
+    /// shape only: `directDNS` is unbound here (never read), and is validated by
+    /// `doctor` and again at a bound tunnel's start.
     static func assertBuildable(
         _ outbound: JSONValue, named name: String, secrets: [String]
     ) async throws(ElsewhereError) {

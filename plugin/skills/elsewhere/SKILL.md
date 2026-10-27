@@ -36,6 +36,9 @@ When a fetch fails or a site is blocked from your network:
   alone. The cut is by character, never inside a grapheme.
 - A `note:` header line means the body was cut at the 5 MB cap. A `binary body (…)` line
   means the content is not text — use the CLI's `--output FILE`.
+- Redirects are followed by default. When a page geo-redirects or bounces to a
+  consent wall, `follow_redirects: false` (CLI: `--no-redirects`) returns the 3xx
+  itself — read the `location` header line instead of following it.
 
 ## Exits, `direct` and the guard
 
@@ -43,9 +46,11 @@ When a fetch fails or a site is blocked from your network:
   kinds (link, xray, proxy), redacted endpoints and the default. The tools cannot add or
   change exits — that is the user's `elsewhere exits add …`.
 - `direct` is the machine's own path with every socket bound to the physical interface,
-  so it bypasses a system VPN. It fails loudly (status 69) when no physical interface
-  resolves — it never falls back silently to the system path. When the server runs with
-  `--via-system`, nothing is bound and `direct` is simply the system path.
+  so it bypasses a system VPN. It also resolves names itself — DoH servers reached
+  through the bound lane, never the system resolver, which a tunnel may own — and a
+  failed lookup fails the fetch loudly, it never falls back silently to the system
+  path. When the server runs with `--via-system`, nothing is bound and `direct` is
+  simply the system path, name lookup included.
 - Private and local destinations — `localhost`, 10/8, 172.16/12, 192.168/16, 127/8,
   link-local including `169.254.169.254`, and their IPv6 counterparts — are refused, on
   every redirect hop too, unless the server was started with `--allow-private`. No page
@@ -70,7 +75,8 @@ the lowercase forms) for one command — `git clone`, `curl`, `npm`, `pip` throu
 exit; the command's own exit status passes through (a signal → 128 + n). There is
 deliberately no MCP tool for this: a host that can run commands has a shell.
 `elsewhere doctor` checks the chain end to end when something is off (exit 1 on any
-failure).
+failure), including a warning when the system resolver is tunnel-owned — the fake-IP
+style resolver `direct` exists to work around.
 
 ## Setup
 

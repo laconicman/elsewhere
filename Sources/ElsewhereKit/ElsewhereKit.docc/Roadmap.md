@@ -50,6 +50,11 @@ wanted, HEAD/POST if ever needed, exit health in `whoami`, maybe `exits import -
 - **#22** ([#21](https://github.com/laconicman/elsewhere/issues/21)): the process owns
   its stdout — engine parse-time warnings go to the sink, never into `fetch`'s
   payload or `serve`'s frames.
+- **#23** ([#5](https://github.com/laconicman/elsewhere/issues/5)): `direct`
+  resolves names itself over DoH through the bound lane (`directDNS`),
+  `ForceIPv4v6` so a failed lookup is a failed fetch (TD-4 discharged); `doctor`
+  warns on a tunnel-owned system resolver; `fetch --no-redirects` /
+  `follow_redirects: false` returns the 3xx itself.
 
 ## M4 · LadaX-macOS plan — *later*
 

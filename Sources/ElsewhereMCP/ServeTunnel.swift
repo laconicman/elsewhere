@@ -33,15 +33,18 @@ actor ServeTunnel {
         ElsewhereConfig, BindInterface, XrayConfigBuilder.XrayLog
     ) async throws(ElsewhereError) -> TunnelSession
 
-    /// What decides the engine's routes — the exits and the interface they bind
-    /// to. A change here on disk reopens the session; `default` and `userAgent`
-    /// are read per call from the lease's config and need none.
+    /// What decides the engine's routes — the exits, the interface they bind
+    /// to, and the servers `direct` resolves through. A change here on disk
+    /// reopens the session; `default` and `userAgent` are read per call from
+    /// the lease's config and need none.
     private struct Routing: Equatable {
         let exits: [String: Exit]
         let bindInterface: BindInterface
+        let directDNS: [String]
         init(_ config: ElsewhereConfig, options: ServeOptions) {
             exits = config.exits
             bindInterface = options.bindInterface(for: config)
+            directDNS = config.directDNSServers
         }
     }
 
