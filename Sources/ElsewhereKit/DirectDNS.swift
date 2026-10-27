@@ -33,14 +33,15 @@ public enum DirectDNS {
     /// (`app/dns/nameserver_doh.go` L133–148 at v26.10.21). The scheme is exactly
     /// `https` — `https+local://` dials the system resolver directly — and
     /// userinfo is refused: this file holds secrets, so an entry is echoed only
-    /// sanitized — `Redactor.redact(url:)` when it parses (userinfo gone,
-    /// scheme/host/path kept — what the user needs to see), `scrubPatterns`
-    /// when it does not. Query and fragment are refused too, and the path must
-    /// be more than `/` — the contract is `https://<ip>/path`, nothing else. An
-    /// empty list fails too — and must: an empty `dns.servers` would make Xray
-    /// add a `localhost` system-resolver client (`app/dns/dns.go` L168–170),
-    /// the very resolver `direct` exists to avoid.
-    /// - Throws: `.config` naming the entry's index and its sanitized form.
+    /// as `scheme://host[:port]` (built from URLComponents — path and query
+    /// could carry a secret, so they are never echoed), `scrubPatterns` when
+    /// it does not parse at all. Query and fragment are refused too, and the
+    /// path must be more than `/` — the contract is `https://<ip>/path`,
+    /// nothing else. An empty list fails too — and must: an empty
+    /// `dns.servers` would make Xray add a `localhost` system-resolver client
+    /// (`app/dns/dns.go` L168–170), the very resolver `direct` exists to avoid.
+    /// - Throws: `.config` naming the entry's index, its sanitized form and
+    ///   which rule it broke.
     public static func validate(_ servers: [String]) throws(ElsewhereError) {
         guard !servers.isEmpty else {
             throw .config(
@@ -48,20 +49,39 @@ public enum DirectDNS {
         }
         for (index, entry) in servers.enumerated() {
             let url = URL(string: entry)
-            let shown = url.map(Redactor.redact(url:)) ?? Redactor.scrubPatterns(entry)
+            let shown = url.flatMap { parsed -> String? in
+                var components = URLComponents()
+                components.scheme = parsed.scheme
+                components.host = parsed.host(percentEncoded: false)
+                components.port = parsed.port
+                return components.string
+            } ?? Redactor.scrubPatterns(entry)
             let credentialed = url?.user != nil || url?.password != nil
-            guard let url,
-                url.scheme == "https",
-                !credentialed,
-                let host = url.host(percentEncoded: false),
-                IPv4Address(host) != nil || IPv6Address(host) != nil,
-                url.path().count > 1,
-                url.query == nil, url.fragment == nil
-            else {
+            let isIPLiteral = url?.host(percentEncoded: false).map {
+                IPv4Address($0) != nil || IPv6Address($0) != nil
+            } ?? false
+            let violation: String?
+            if url == nil {
+                violation = "is not a URL"
+            } else if url?.scheme != "https" {
+                violation = "scheme must be https"
+            } else if !isIPLiteral {
+                violation = "host must be an IP literal — "
+                    + "a hostname would need the system resolver to bootstrap"
+            } else if credentialed {
+                violation = "credentials are refused"
+            } else if url?.query != nil {
+                violation = "query is refused"
+            } else if url?.fragment != nil {
+                violation = "fragment is refused"
+            } else if url?.path().count ?? 0 <= 1 {
+                violation = "path is missing"
+            } else {
+                violation = nil
+            }
+            if let violation {
                 throw .config(
-                    "directDNS[\(index)] '\(shown)' must be https://<ip>/path — "
-                        + "a hostname would need the system resolver to bootstrap"
-                        + (credentialed ? " (credentials are refused)" : ""))
+                    "directDNS[\(index)] '\(shown)' must be https://<ip>/path — \(violation)")
             }
         }
     }
