@@ -126,6 +126,25 @@ resolver will not give — cannot be expressed at all.
 `serve` builds its config once per tunnel and would need a restart or a refusal —
 decide whether a tool argument is worth that asymmetry. Recorded, not scheduled.
 
+### TD-10 — one redaction policy for printed page URLs, owner-configurable — *open* (no issue yet)
+
+Every printed page URL — `url`/`finalURL`/`redirects` in `--json`, the stderr
+`location:` line, the MCP render's header lines — goes through
+`Redactor.redact(url:)`, which removes userinfo and keeps the rest: where the page
+sent us is data. Stderr additionally runs a blanket `scheme://` pattern scrub, which
+is why the `location:` line drops its scheme to survive it. The two rules sit side by
+side; PR #23's review round asked once for the query to be kept (identification) and
+once for it to be dropped (a page-chosen `?password=` token) — both reasonable,
+depending on where the output goes.
+
+**Cost:** the stance is fixed at `userinfo` and spelled twice (one URL rule, one
+stderr rule); an operator whose logs must not carry query strings has no knob.
+**Discharge:** a `redactURLs` level in the config — `userinfo` (today's default),
+`query` (drop query and fragment, keep host[:port]/path), `host` (host[:port] only) —
+applied by `redact(url:)` wherever a page URL is printed, so stderr prints the same
+form as stdout and the blanket scrub no longer needs a scheme-dropping special case.
+Recorded, not scheduled; the first operator need picks the moment.
+
 ## See Also
 
 - <doc:Design>
