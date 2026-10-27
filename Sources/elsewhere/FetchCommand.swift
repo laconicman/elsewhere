@@ -204,11 +204,15 @@ struct FetchCommand: AsyncParsableCommand {
         }
         if !json && !head, let location = result.headers["location"] {
             // A stopped 3xx's body is usually empty — the header is where it
-            // pointed (`--head`/`--json` already show it). host + path, no
-            // scheme — the pattern scrub strips `scheme://` tokens; a relative
-            // Location survives as-is.
-            let target = URL(string: location).flatMap { url in
-                url.host(percentEncoded: false).map { $0 + url.path() }
+            // pointed (`--head`/`--json` already show it). Everything after the
+            // scheme — host[:port], path, query, fragment — with userinfo gone;
+            // no `scheme://` token remains, so printError's pattern scrub leaves
+            // it alone. A relative Location has no `://` and passes through.
+            let target = URL(string: location).map { url in
+                let redacted = Redactor.redact(url: url)
+                return redacted.range(of: "://").map {
+                    String(redacted[$0.upperBound...])
+                } ?? redacted
             } ?? location
             printError("location: \(target)")
         }
