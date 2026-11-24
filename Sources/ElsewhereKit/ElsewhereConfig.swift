@@ -149,12 +149,16 @@ public enum UserAgent: Sendable, Hashable {
 
     /// The current Chrome-on-macOS UA string. Chrome's UA-reduction freeze pins the
     /// build to `0.0.0` and the OS token to `10_15_7`, so only the major version moves.
-    /// Stable on 2026-10-23 is 156.0.8078.48:
-    /// <https://chromereleases.googleblog.com/2026/10/> (M-156 rolled out 2026-10-20).
+    /// Stable on 2026-11-24 is 158.0.8127.89 — announced by the releases blog
+    /// 2026-11-23; the Version History API lists it at fraction 1 while
+    /// 159.0.8154.13 trickles at 0.005 — a version's `releases` sub-endpoint
+    /// carries the fraction, the bare list does not:
+    /// <https://versionhistory.googleapis.com/v1/chrome/platforms/mac/channels/stable/versions>
+    /// · <https://chromereleases.googleblog.com/2026/11/>
     /// One named constant, hand-bumped per release — TechDebt TD-1.
     public static let chromeString =
         "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
-        + "(KHTML, like Gecko) Chrome/156.0.0.0 Safari/537.36"
+        + "(KHTML, like Gecko) Chrome/158.0.0.0 Safari/537.36"
 
     /// The header string — `chrome` renders as the pinned Chrome UA (TD-1).
     public var headerValue: String {
