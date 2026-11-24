@@ -37,6 +37,11 @@ and checked live with `gh`.
 - When the reviewer's re-run on the head reads `owed 0 / to re-read 0`, and the owner
   approves: `gh pr merge N --merge --auto`.
 
+**Per release:** before the milestone-close recipe below, check Chrome stable's major
+against `UserAgent.chromeString` (its comment names the source and the rollout
+fraction to check — the bare version list can show a sub-1% trickle) and land the
+bump as an ordinary PR when it moved — that bump is TD-1's discharge.
+
 **Closing milestone M_n**, done in the PR that completes it and right after it merges.
 The milestone is the one source: its title ends in the tag (`0.1.0` for M2, `0.2.0` for
 M3 — M1 has no tag of its own) and its description is the done-when. The PR that
